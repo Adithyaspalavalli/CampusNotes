@@ -4,6 +4,13 @@ const protect = require("../middleware/authMiddleware");
 const masterOnly = require("../middleware/masterMiddleware");
 
 const {
+  getAllSubjects,
+  createSubject,
+  updateSubject,
+  toggleSubjectStatus,
+} = require("../controllers/subjectController");
+
+const {
   getAdmins,
   createAdmin,
   updateAdminPermissions,
@@ -78,6 +85,40 @@ router.delete(
   protect,
   masterOnly,
   deleteAdmin
+);
+
+// Subject management
+
+// Get all subjects
+router.get(
+  "/subjects",
+  protect,
+  masterOnly,
+  getAllSubjects
+);
+
+// Create subject
+router.post(
+  "/subjects",
+  protect,
+  masterOnly,
+  createSubject
+);
+
+// Edit subject
+router.put(
+  "/subjects/:id",
+  protect,
+  masterOnly,
+  updateSubject
+);
+
+// Enable / disable subject
+router.put(
+  "/subjects/:id/toggle-status",
+  protect,
+  masterOnly,
+  toggleSubjectStatus
 );
 
 module.exports = router;

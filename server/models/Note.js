@@ -42,6 +42,7 @@ const noteSchema = new mongoose.Schema(
       maxlength: 150,
     },
 
+    // File information
     fileUrl: {
       type: String,
       required: true,
@@ -52,11 +53,51 @@ const noteSchema = new mongoose.Schema(
       required: true,
     },
 
+    // User who uploaded this version
     uploadedBy: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
       required: true,
     },
+
+    // -----------------------------
+    // VERSION INFORMATION
+    // -----------------------------
+
+    // All versions of the same note
+    // share the same noteSeriesId
+    noteSeriesId: {
+      type: mongoose.Schema.Types.ObjectId,
+      required: true,
+      index: true,
+    },
+
+    // Version number
+    version: {
+      type: Number,
+      required: true,
+      default: 1,
+      min: 1,
+    },
+
+    // Previous version
+    previousVersion: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Note",
+      default: null,
+    },
+
+    // Only one version in a series
+    // should normally be current
+    isCurrent: {
+      type: Boolean,
+      default: true,
+      index: true,
+    },
+
+    // -----------------------------
+    // MODERATION
+    // -----------------------------
 
     status: {
       type: String,
@@ -64,8 +105,10 @@ const noteSchema = new mongoose.Schema(
         "PENDING",
         "APPROVED",
         "REJECTED",
+        "OUTDATED",
       ],
       default: "PENDING",
+      index: true,
     },
 
     rejectionReason: {
@@ -86,6 +129,21 @@ const noteSchema = new mongoose.Schema(
       default: null,
     },
 
+    rejectedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      default: null,
+    },
+
+    rejectedAt: {
+      type: Date,
+      default: null,
+    },
+
+    // -----------------------------
+    // STATISTICS
+    // -----------------------------
+
     downloadCount: {
       type: Number,
       default: 0,
@@ -97,6 +155,9 @@ const noteSchema = new mongoose.Schema(
   }
 );
 
+
+// Helpful indexes
+
 noteSchema.index({
   status: 1,
   subject: 1,
@@ -104,10 +165,16 @@ noteSchema.index({
 });
 
 noteSchema.index({
+  noteSeriesId: 1,
+  version: 1,
+});
+
+noteSchema.index({
   title: "text",
   topic: "text",
   description: "text",
 });
+
 
 module.exports = mongoose.model(
   "Note",

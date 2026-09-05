@@ -5,6 +5,7 @@ const upload = require("../middleware/uploadMiddleware");
 
 const {
   createNote,
+  createNoteVersion,
 } = require("../controllers/noteController");
 
 const router = express.Router();
@@ -16,6 +17,13 @@ router.post(
   protect,
   upload.single("file"),
   createNote
+);
+// Upload a new version of an existing note
+router.post(
+  "/:id/version",
+  protect,
+  upload.single("file"),
+  createNoteVersion
 );
 
 module.exports = router;
