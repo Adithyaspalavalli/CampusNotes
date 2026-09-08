@@ -145,6 +145,7 @@ const approveNote = async (req, res) => {
   try {
     const { id } = req.params;
 
+    // Validate Note ID
     if (!mongoose.Types.ObjectId.isValid(id)) {
       return res.status(400).json({
         message: "Invalid note ID",
@@ -160,58 +161,77 @@ const approveNote = async (req, res) => {
     }
 
     // Check permission
-    if (
-      req.user.role !== "master" &&
-      !req.user.permissions?.approveNotes
-    ) {
+    const isMaster = req.user.role === "master";
+    const canApprove =
+      isMaster || req.user.permissions?.approveNotes === true;
+
+    if (!canApprove) {
       return res.status(403).json({
-        message:
-          "You do not have permission to approve notes",
+        message: "You do not have permission to approve notes",
       });
     }
 
-    // Check subject access
-    if (!hasSubjectAccess(req.user, note)) {
+    // Check subject access for Admin
+    if (!isMaster && !hasSubjectAccess(req.user, note)) {
       return res.status(403).json({
-        message:
-          "You do not have access to this subject",
+        message: "You do not have access to this subject",
       });
     }
 
     // Only pending notes can be approved
     if (note.status !== "PENDING") {
       return res.status(400).json({
-        message:
-          "Only pending notes can be approved",
+        message: `Note cannot be approved because its status is ${note.status}`,
       });
     }
 
+    // Find currently active version in this note series
+    const currentVersion = await Note.findOne({
+      noteSeriesId: note.noteSeriesId,
+      isCurrent: true,
+      _id: { $ne: note._id },
+    });
+
+    // If an older version exists, mark it outdated
+    if (currentVersion) {
+      currentVersion.status = "OUTDATED";
+      currentVersion.isCurrent = false;
+
+      await currentVersion.save();
+    }
+
+    // Approve the new version
     note.status = "APPROVED";
+    note.isCurrent = true;
+
     note.approvedBy = req.user._id;
     note.approvedAt = new Date();
+
+    // Clear rejection information
     note.rejectionReason = null;
+    note.rejectedBy = null;
+    note.rejectedAt = null;
 
     await note.save();
 
-    res.json({
+    return res.status(200).json({
       message: "Note approved successfully",
-
       note: {
         id: note._id,
         status: note.status,
+        version: note.version,
+        isCurrent: note.isCurrent,
         approvedBy: note.approvedBy,
         approvedAt: note.approvedAt,
       },
     });
 
   } catch (error) {
-    console.error(
-      "Approve note error:",
-      error
-    );
+    console.error("APPROVE NOTE ERROR:", error);
 
-    res.status(500).json({
+    return res.status(500).json({
       message: "Failed to approve note",
+      error: error.message,
     });
   }
 };

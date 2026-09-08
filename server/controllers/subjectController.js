@@ -3,6 +3,28 @@ const mongoose = require("mongoose");
 const Subject = require("../models/Subject");
 
 
+const getActiveSubjects = async (req, res) => {
+  try {
+    const subjects = await Subject.find({
+      isActive: true,
+    })
+      .sort({ semester: 1, name: 1 })
+      .select("_id name code semester");
+
+    return res.status(200).json({
+      count: subjects.length,
+      subjects,
+    });
+  } catch (error) {
+    console.error("Get active subjects error:", error);
+
+    return res.status(500).json({
+      message: "Failed to fetch subjects",
+    });
+  }
+};
+
+
 // Get all subjects
 const getAllSubjects = async (req, res) => {
   try {
@@ -293,6 +315,7 @@ const toggleSubjectStatus = async (
 
 
 module.exports = {
+  getActiveSubjects,
   getAllSubjects,
   createSubject,
   updateSubject,

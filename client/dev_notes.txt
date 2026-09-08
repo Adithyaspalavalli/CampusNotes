@@ -1,0 +1,55 @@
+6.11 Test Login
+
+Enter:
+
+Email:
+studentfrontend@test.com
+
+Password:
+Student@123
+
+Click:
+
+Login
+
+The backend should return:
+
+{
+  "message": "Login successful",
+  "token": "...",
+  "user": {
+    "id": "...",
+    "name": "Test Student",
+    "email": "studentfrontend@test.com",
+    "role": "student"
+  }
+}
+
+The frontend then stores:
+
+campusnotes_token
+campusnotes_user
+
+in localStorage.
+
+6.12 Verify the JWT
+
+In Chrome:
+
+F12 → Application → Local Storage →
+
+http://localhost:5173
+
+You should see:
+
+campusnotes_token
+campusnotes_user
+
+campusnotes_user should contain something like:
+
+{
+  "id": "....",
+  "name": "Test Student",
+  "email": "studentfrontend@test.com",
+  "role": "student"
+}

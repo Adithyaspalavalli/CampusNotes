@@ -4,6 +4,250 @@ const fs = require("fs");
 const Note = require("../models/Note");
 const Subject = require("../models/Subject");
 
+const getNotes = async (req, res) => {
+  try {
+    const notes = await Note.find({
+      status: "APPROVED",
+      isCurrent: true,
+    })
+      .populate("subject", "name code semester")
+      .populate("uploadedBy", "name email")
+      .sort({ createdAt: -1 });
+
+    return res.json({
+      count: notes.length,
+      notes,
+    });
+  } catch (error) {
+    console.error("Get notes error:", error);
+
+    return res.status(500).json({
+      message: "Failed to fetch notes",
+    });
+  }
+};
+
+const getMyNotes = async (req, res) => {
+  try {
+    const notes = await Note.find({
+      uploadedBy: req.user._id,
+    })
+      .populate("subject", "name code semester")
+      .sort({ createdAt: -1 });
+
+    return res.status(200).json({
+      count: notes.length,
+      notes,
+    });
+  } catch (error) {
+    console.error("Get my notes error:", error);
+
+    return res.status(500).json({
+      message: "Failed to fetch your notes",
+    });
+  }
+};
+
+const deleteMyNote = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({
+        message: "Invalid note ID",
+      });
+    }
+
+    const note = await Note.findById(id);
+
+    if (!note) {
+      return res.status(404).json({
+        message: "Note not found",
+      });
+    }
+
+    if (req.user.role !== "master") {
+      if (
+        note.uploadedBy.toString() !==
+        req.user._id.toString()
+      ) {
+        return res.status(403).json({
+          message: "You can only delete your own notes",
+        });
+      }
+    }
+
+    if (note.fileUrl && fs.existsSync(note.fileUrl)) {
+      fs.unlinkSync(note.fileUrl);
+    }
+
+    await Note.findByIdAndDelete(id);
+
+    return res.status(200).json({
+      message: "Note deleted successfully",
+    });
+  } catch (error) {
+    console.error("Delete note error:", error);
+
+    return res.status(500).json({
+      message: "Failed to delete note",
+    });
+  }
+};
+
+const getNoteById = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({
+        message: "Invalid note ID",
+      });
+    }
+
+    const note = await Note.findOne({
+      _id: id,
+      status: "APPROVED",
+      isCurrent: true,
+    })
+      .populate("subject", "name code semester")
+      .populate("uploadedBy", "name email");
+
+    if (!note) {
+      return res.status(404).json({
+        message: "Note not found or is no longer available",
+      });
+    }
+
+    return res.status(200).json({ note });
+  } catch (error) {
+    console.error("Get note by ID error:", error);
+
+    return res.status(500).json({
+      message: "Failed to fetch note",
+    });
+  }
+};
+
+const readNote = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({
+        message: "Invalid note ID",
+      });
+    }
+
+    const note = await Note.findOne({
+      _id: id,
+      status: "APPROVED",
+      isCurrent: true,
+    });
+
+    if (!note) {
+      return res.status(404).json({
+        message: "Note not found or is no longer available",
+      });
+    }
+
+    if (!note.fileUrl || !fs.existsSync(note.fileUrl)) {
+      return res.status(404).json({
+        message: "PDF file not found",
+      });
+    }
+
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader(
+      "Content-Disposition",
+      `inline; filename="${note.fileName}"`
+    );
+
+    const fileStream = fs.createReadStream(note.fileUrl);
+
+    fileStream.on("error", (error) => {
+      console.error("PDF read stream error:", error);
+
+      if (!res.headersSent) {
+        res.status(500).json({
+          message: "Failed to read PDF",
+        });
+      }
+    });
+
+    fileStream.pipe(res);
+  } catch (error) {
+    console.error("Read note error:", error);
+
+    if (!res.headersSent) {
+      return res.status(500).json({
+        message: "Failed to read note",
+      });
+    }
+  }
+};
+
+const downloadNote = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({
+        message: "Invalid note ID",
+      });
+    }
+
+    const note = await Note.findOne({
+      _id: id,
+      status: "APPROVED",
+      isCurrent: true,
+    });
+
+    if (!note) {
+      return res.status(404).json({
+        message: "Note not found or is no longer available",
+      });
+    }
+
+    if (!note.fileUrl || !fs.existsSync(note.fileUrl)) {
+      return res.status(404).json({
+        message: "PDF file not found",
+      });
+    }
+
+    note.downloadCount += 1;
+    await note.save();
+
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader(
+      "Content-Disposition",
+      `attachment; filename="${note.fileName}"`
+    );
+
+    const fileStream = fs.createReadStream(note.fileUrl);
+
+    fileStream.on("error", (error) => {
+      console.error("PDF download stream error:", error);
+
+      if (!res.headersSent) {
+        res.status(500).json({
+          message: "Failed to download PDF",
+        });
+      }
+    });
+
+    fileStream.pipe(res);
+  } catch (error) {
+    console.error("Download note error:", error);
+
+    if (!res.headersSent) {
+      return res.status(500).json({
+        message: "Failed to download note",
+      });
+    }
+  }
+};
+
 const createNote = async (req, res) => {
   try {
     const {
@@ -15,14 +259,14 @@ const createNote = async (req, res) => {
       topic,
     } = req.body;
 
-    console.log("NOTE BODY:", req.body);
-    console.log("NOTE FILE:", req.file);
-    console.log("TITLE:", title);
-    console.log("DESCRIPTION:", description);
-    console.log("SEMESTER:", semester);
-    console.log("SUBJECT:", subject);
-    console.log("UNIT:", unit);
-    console.log("TOPIC:", topic);
+    // console.log("NOTE BODY:", req.body);
+    // console.log("NOTE FILE:", req.file);
+    // console.log("TITLE:", title);
+    // console.log("DESCRIPTION:", description);
+    // console.log("SEMESTER:", semester);
+    // console.log("SUBJECT:", subject);
+    // console.log("UNIT:", unit);
+    // console.log("TOPIC:", topic);
 
     // Check uploaded file
     if (!req.file) {
@@ -307,6 +551,12 @@ const createNoteVersion = async (req, res) => {
 };
 
 module.exports = {
+  getNotes,
+  getMyNotes,
+  getNoteById,
+  readNote,
+  downloadNote,
   createNote,
   createNoteVersion,
+  deleteMyNote,
 };

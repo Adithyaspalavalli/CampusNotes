@@ -9,6 +9,7 @@ const masterRoutes = require("./routes/masterRoutes");
 const statsRoutes = require("./routes/statsRoutes");
 const passwordRoutes = require("./routes/passwordRoutes");
 const noteRoutes = require("./routes/noteRoutes");
+const subjectRoutes = require("./routes/subjectRoutes");
 const adminNoteRoutes = require("./routes/adminNoteRoutes");
 const testRoutes = require("./routes/testRoutes");
 
@@ -36,6 +37,10 @@ app.use(
 app.use(
   "/api/notes",
   noteRoutes
+);
+app.use(
+  "/api/subjects",
+  subjectRoutes
 );
 app.use(
   "/api/admin/notes",
