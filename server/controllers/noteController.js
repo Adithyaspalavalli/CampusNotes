@@ -4,6 +4,13 @@ const fs = require("fs");
 const Note = require("../models/Note");
 const Subject = require("../models/Subject");
 
+/*
+==================================================
+GET ALL APPROVED CURRENT NOTES
+GET /api/notes
+==================================================
+*/
+
 const getNotes = async (req, res) => {
   try {
     const notes = await Note.find({
@@ -14,7 +21,7 @@ const getNotes = async (req, res) => {
       .populate("uploadedBy", "name email")
       .sort({ createdAt: -1 });
 
-    return res.json({
+    return res.status(200).json({
       count: notes.length,
       notes,
     });
@@ -26,6 +33,13 @@ const getNotes = async (req, res) => {
     });
   }
 };
+
+/*
+==================================================
+GET CURRENT USER'S NOTES
+GET /api/notes/my
+==================================================
+*/
 
 const getMyNotes = async (req, res) => {
   try {
@@ -48,16 +62,25 @@ const getMyNotes = async (req, res) => {
   }
 };
 
+/*
+==================================================
+DELETE NOTE
+DELETE /api/notes/:id
+==================================================
+*/
+
 const deleteMyNote = async (req, res) => {
   try {
     const { id } = req.params;
 
+    // Validate ObjectId
     if (!mongoose.Types.ObjectId.isValid(id)) {
       return res.status(400).json({
         message: "Invalid note ID",
       });
     }
 
+    // Find note
     const note = await Note.findById(id);
 
     if (!note) {
@@ -66,7 +89,31 @@ const deleteMyNote = async (req, res) => {
       });
     }
 
-    if (req.user.role !== "master") {
+    /*
+    -----------------------------------------------
+    MASTER
+    -----------------------------------------------
+    Master can delete any note.
+    */
+
+    if (req.user.role === "master") {
+      // Master is allowed
+    }
+
+    /*
+    -----------------------------------------------
+    NON-MASTER USERS
+    -----------------------------------------------
+    Students can delete only their own notes.
+
+    Admins can currently delete only their own notes
+    through this endpoint.
+
+    Admin deletion of other users' notes will be
+    handled later through the Admin permission system.
+    */
+
+    else {
       if (
         note.uploadedBy.toString() !==
         req.user._id.toString()
@@ -77,9 +124,24 @@ const deleteMyNote = async (req, res) => {
       }
     }
 
-    if (note.fileUrl && fs.existsSync(note.fileUrl)) {
+    /*
+    -----------------------------------------------
+    DELETE PDF FILE
+    -----------------------------------------------
+    */
+
+    if (
+      note.fileUrl &&
+      fs.existsSync(note.fileUrl)
+    ) {
       fs.unlinkSync(note.fileUrl);
     }
+
+    /*
+    -----------------------------------------------
+    DELETE DATABASE RECORD
+    -----------------------------------------------
+    */
 
     await Note.findByIdAndDelete(id);
 
@@ -95,10 +157,18 @@ const deleteMyNote = async (req, res) => {
   }
 };
 
+/*
+==================================================
+GET SINGLE APPROVED CURRENT NOTE
+GET /api/notes/:id
+==================================================
+*/
+
 const getNoteById = async (req, res) => {
   try {
     const { id } = req.params;
 
+    // Validate ObjectId
     if (!mongoose.Types.ObjectId.isValid(id)) {
       return res.status(400).json({
         message: "Invalid note ID",
@@ -115,11 +185,14 @@ const getNoteById = async (req, res) => {
 
     if (!note) {
       return res.status(404).json({
-        message: "Note not found or is no longer available",
+        message:
+          "Note not found or is no longer available",
       });
     }
 
-    return res.status(200).json({ note });
+    return res.status(200).json({
+      note,
+    });
   } catch (error) {
     console.error("Get note by ID error:", error);
 
@@ -129,16 +202,28 @@ const getNoteById = async (req, res) => {
   }
 };
 
+/*
+==================================================
+READ APPROVED CURRENT NOTE
+GET /api/notes/:id/read
+
+Used by the student React-PDF viewer.
+Does NOT increase download count.
+==================================================
+*/
+
 const readNote = async (req, res) => {
   try {
     const { id } = req.params;
 
+    // Validate ObjectId
     if (!mongoose.Types.ObjectId.isValid(id)) {
       return res.status(400).json({
         message: "Invalid note ID",
       });
     }
 
+    // Only approved/current notes can be read
     const note = await Note.findOne({
       _id: id,
       status: "APPROVED",
@@ -147,26 +232,40 @@ const readNote = async (req, res) => {
 
     if (!note) {
       return res.status(404).json({
-        message: "Note not found or is no longer available",
+        message:
+          "Note not found or is no longer available",
       });
     }
 
-    if (!note.fileUrl || !fs.existsSync(note.fileUrl)) {
+    // Check PDF file
+    if (
+      !note.fileUrl ||
+      !fs.existsSync(note.fileUrl)
+    ) {
       return res.status(404).json({
         message: "PDF file not found",
       });
     }
 
-    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader(
+      "Content-Type",
+      "application/pdf"
+    );
+
     res.setHeader(
       "Content-Disposition",
       `inline; filename="${note.fileName}"`
     );
 
-    const fileStream = fs.createReadStream(note.fileUrl);
+    const fileStream = fs.createReadStream(
+      note.fileUrl
+    );
 
     fileStream.on("error", (error) => {
-      console.error("PDF read stream error:", error);
+      console.error(
+        "PDF read stream error:",
+        error
+      );
 
       if (!res.headersSent) {
         res.status(500).json({
@@ -187,16 +286,27 @@ const readNote = async (req, res) => {
   }
 };
 
+/*
+==================================================
+DOWNLOAD APPROVED CURRENT NOTE
+GET /api/notes/:id/download
+
+Increases downloadCount by 1.
+==================================================
+*/
+
 const downloadNote = async (req, res) => {
   try {
     const { id } = req.params;
 
+    // Validate ObjectId
     if (!mongoose.Types.ObjectId.isValid(id)) {
       return res.status(400).json({
         message: "Invalid note ID",
       });
     }
 
+    // Only approved/current notes can be downloaded
     const note = await Note.findOne({
       _id: id,
       status: "APPROVED",
@@ -205,29 +315,56 @@ const downloadNote = async (req, res) => {
 
     if (!note) {
       return res.status(404).json({
-        message: "Note not found or is no longer available",
+        message:
+          "Note not found or is no longer available",
       });
     }
 
-    if (!note.fileUrl || !fs.existsSync(note.fileUrl)) {
+    // Check PDF file
+    if (
+      !note.fileUrl ||
+      !fs.existsSync(note.fileUrl)
+    ) {
       return res.status(404).json({
         message: "PDF file not found",
       });
     }
 
+    /*
+    -----------------------------------------------
+    INCREASE DOWNLOAD COUNT
+    -----------------------------------------------
+    */
+
     note.downloadCount += 1;
+
     await note.save();
 
-    res.setHeader("Content-Type", "application/pdf");
+    /*
+    -----------------------------------------------
+    SEND FILE
+    -----------------------------------------------
+    */
+
+    res.setHeader(
+      "Content-Type",
+      "application/pdf"
+    );
+
     res.setHeader(
       "Content-Disposition",
       `attachment; filename="${note.fileName}"`
     );
 
-    const fileStream = fs.createReadStream(note.fileUrl);
+    const fileStream = fs.createReadStream(
+      note.fileUrl
+    );
 
     fileStream.on("error", (error) => {
-      console.error("PDF download stream error:", error);
+      console.error(
+        "PDF download stream error:",
+        error
+      );
 
       if (!res.headersSent) {
         res.status(500).json({
@@ -238,7 +375,10 @@ const downloadNote = async (req, res) => {
 
     fileStream.pipe(res);
   } catch (error) {
-    console.error("Download note error:", error);
+    console.error(
+      "Download note error:",
+      error
+    );
 
     if (!res.headersSent) {
       return res.status(500).json({
@@ -247,6 +387,13 @@ const downloadNote = async (req, res) => {
     }
   }
 };
+
+/*
+==================================================
+CREATE NEW NOTE
+POST /api/notes
+==================================================
+*/
 
 const createNote = async (req, res) => {
   try {
@@ -259,23 +406,24 @@ const createNote = async (req, res) => {
       topic,
     } = req.body;
 
-    // console.log("NOTE BODY:", req.body);
-    // console.log("NOTE FILE:", req.file);
-    // console.log("TITLE:", title);
-    // console.log("DESCRIPTION:", description);
-    // console.log("SEMESTER:", semester);
-    // console.log("SUBJECT:", subject);
-    // console.log("UNIT:", unit);
-    // console.log("TOPIC:", topic);
+    /*
+    -----------------------------------------------
+    CHECK FILE
+    -----------------------------------------------
+    */
 
-    // Check uploaded file
     if (!req.file) {
       return res.status(400).json({
         message: "Please upload a PDF file",
       });
     }
 
-    // Validate required fields
+    /*
+    -----------------------------------------------
+    REQUIRED FIELDS
+    -----------------------------------------------
+    */
+
     if (
       !title ||
       !semester ||
@@ -291,8 +439,15 @@ const createNote = async (req, res) => {
       });
     }
 
-    // Validate Subject ObjectId
-    if (!mongoose.Types.ObjectId.isValid(subject)) {
+    /*
+    -----------------------------------------------
+    VALIDATE SUBJECT ID
+    -----------------------------------------------
+    */
+
+    if (
+      !mongoose.Types.ObjectId.isValid(subject)
+    ) {
       fs.unlink(req.file.path, () => {});
 
       return res.status(400).json({
@@ -300,7 +455,12 @@ const createNote = async (req, res) => {
       });
     }
 
-    // Find subject
+    /*
+    -----------------------------------------------
+    CHECK ACTIVE SUBJECT
+    -----------------------------------------------
+    */
+
     const subjectExists =
       await Subject.findOne({
         _id: subject,
@@ -311,12 +471,16 @@ const createNote = async (req, res) => {
       fs.unlink(req.file.path, () => {});
 
       return res.status(400).json({
-        message:
-          "Invalid or inactive subject",
+        message: "Invalid or inactive subject",
       });
     }
 
-    // Check semester
+    /*
+    -----------------------------------------------
+    CHECK SEMESTER MATCH
+    -----------------------------------------------
+    */
+
     if (
       Number(semester) !==
       subjectExists.semester
@@ -329,52 +493,78 @@ const createNote = async (req, res) => {
       });
     }
 
-    // Create a new note series
-const noteSeriesId =
-  new mongoose.Types.ObjectId();
+    /*
+    -----------------------------------------------
+    CREATE NOTE SERIES
+    -----------------------------------------------
+    */
 
-const note = await Note.create({
-  title,
-  description,
+    const noteSeriesId =
+      new mongoose.Types.ObjectId();
 
-  semester: Number(semester),
-  subject,
+    /*
+    -----------------------------------------------
+    CREATE FIRST VERSION
+    -----------------------------------------------
+    */
 
-  unit: Number(unit),
-  topic,
+    const note = await Note.create({
+      title,
+      description,
 
-  fileUrl: req.file.path,
-  fileName: req.file.originalname,
+      semester: Number(semester),
+      subject,
 
-  uploadedBy: req.user._id,
+      unit: Number(unit),
+      topic,
 
-  // Version information
-  noteSeriesId,
-  version: 1,
-  previousVersion: null,
+      fileUrl: req.file.path,
+      fileName: req.file.originalname,
 
-  // First version starts pending
-  // and is not publicly current yet.
-  isCurrent: false,
-  status: "PENDING",
+      uploadedBy: req.user._id,
 
-  downloadCount: 0,
-});
+      // Version information
+      noteSeriesId,
+      version: 1,
+      previousVersion: null,
+
+      // First version is pending
+      isCurrent: false,
+      status: "PENDING",
+
+      downloadCount: 0,
+    });
 
     return res.status(201).json({
-      message: "Note uploaded successfully and is waiting for approval",
+      message:
+        "Note uploaded successfully and is waiting for approval",
+
       note,
     });
   } catch (error) {
-    console.error("Create note error:", error);
+    console.error(
+      "Create note error:",
+      error
+    );
 
-    // Remove the uploaded file if note creation fails.
+    /*
+    -----------------------------------------------
+    DELETE UPLOADED FILE IF DB OPERATION FAILS
+    -----------------------------------------------
+    */
+
     if (req.file?.path) {
-      fs.unlink(req.file.path, (unlinkError) => {
-        if (unlinkError) {
-          console.error("Failed to delete uploaded file:", unlinkError);
+      fs.unlink(
+        req.file.path,
+        (unlinkError) => {
+          if (unlinkError) {
+            console.error(
+              "Failed to delete uploaded file:",
+              unlinkError
+            );
+          }
         }
-      });
+      );
     }
 
     return res.status(500).json({
@@ -383,29 +573,70 @@ const note = await Note.create({
   }
 };
 
-const createNoteVersion = async (req, res) => {
+/*
+==================================================
+CREATE NEW NOTE VERSION
+POST /api/notes/:id/version
+==================================================
+
+Flow:
+
+Approved v1
+     ↓
+Upload update
+     ↓
+Pending v2
+     ↓
+Admin approves
+     ↓
+v1 = OUTDATED
+v2 = APPROVED + CURRENT
+==================================================
+*/
+
+const createNoteVersion = async (
+  req,
+  res
+) => {
   try {
     const { id } = req.params;
 
-    // Validate note ID
-    if (!mongoose.Types.ObjectId.isValid(id)) {
+    /*
+    -----------------------------------------------
+    VALIDATE NOTE ID
+    -----------------------------------------------
+    */
+
+    if (
+      !mongoose.Types.ObjectId.isValid(id)
+    ) {
       return res.status(400).json({
         message: "Invalid note ID",
       });
     }
 
-    // File required
+    /*
+    -----------------------------------------------
+    FILE REQUIRED
+    -----------------------------------------------
+    */
+
     if (!req.file) {
       return res.status(400).json({
         message: "Please upload a PDF file",
       });
     }
 
-    // Find base note
-    const baseNote = await Note.findById(id);
+    /*
+    -----------------------------------------------
+    FIND BASE NOTE
+    -----------------------------------------------
+    */
+
+    const baseNote =
+      await Note.findById(id);
 
     if (!baseNote) {
-      // Remove uploaded file
       if (req.file?.path) {
         fs.unlink(req.file.path, () => {});
       }
@@ -415,7 +646,12 @@ const createNoteVersion = async (req, res) => {
       });
     }
 
-    // Only current approved note can receive an update
+    /*
+    -----------------------------------------------
+    ONLY CURRENT APPROVED VERSION CAN BE UPDATED
+    -----------------------------------------------
+    */
+
     if (
       baseNote.status !== "APPROVED" ||
       !baseNote.isCurrent
@@ -431,7 +667,12 @@ const createNoteVersion = async (req, res) => {
       });
     }
 
-    // Check permission
+    /*
+    -----------------------------------------------
+    CHECK EDIT PERMISSION
+    -----------------------------------------------
+    */
+
     const isMaster =
       req.user.role === "master";
 
@@ -460,24 +701,34 @@ const createNoteVersion = async (req, res) => {
       });
     }
 
-    // Determine next version number
+    /*
+    -----------------------------------------------
+    FIND LATEST VERSION
+    -----------------------------------------------
+    */
+
     const latestVersion =
       await Note.findOne({
         noteSeriesId:
           baseNote.noteSeriesId,
-      })
-        .sort({
-          version: -1,
-        });
+      }).sort({
+        version: -1,
+      });
 
     const nextVersion =
       (latestVersion?.version || 0) + 1;
 
-    // Create new version
+    /*
+    -----------------------------------------------
+    CREATE NEW VERSION
+    -----------------------------------------------
+    */
+
     const newVersion =
       await Note.create({
         title: baseNote.title,
-        description: baseNote.description,
+        description:
+          baseNote.description,
 
         semester: baseNote.semester,
         subject: baseNote.subject,
@@ -499,15 +750,14 @@ const createNoteVersion = async (req, res) => {
         previousVersion:
           baseNote._id,
 
-        // Important:
-        // New version is not public yet
+        // New version is pending
         isCurrent: false,
         status: "PENDING",
 
         downloadCount: 0,
       });
 
-    res.status(201).json({
+    return res.status(201).json({
       message:
         "New note version uploaded and is waiting for approval",
 
@@ -521,14 +771,18 @@ const createNoteVersion = async (req, res) => {
           newVersion.previousVersion,
       },
     });
-
   } catch (error) {
     console.error(
       "Create note version error:",
       error
     );
 
-    // Remove uploaded file if database operation failed
+    /*
+    -----------------------------------------------
+    DELETE FILE IF CREATION FAILED
+    -----------------------------------------------
+    */
+
     if (req.file?.path) {
       fs.unlink(
         req.file.path,
@@ -543,20 +797,359 @@ const createNoteVersion = async (req, res) => {
       );
     }
 
-    res.status(500).json({
+    return res.status(500).json({
       message:
         "Failed to create note version",
     });
   }
 };
 
+/*
+==================================================
+PREVIEW PENDING NOTE FOR ADMIN
+GET /api/admin/notes/:id/preview
+
+Used to get metadata for Admin moderation.
+==================================================
+*/
+
+const previewNoteForAdmin = async (
+  req,
+  res
+) => {
+  try {
+    const { id } = req.params;
+
+    /*
+    -----------------------------------------------
+    VALIDATE ID
+    -----------------------------------------------
+    */
+
+    if (
+      !mongoose.Types.ObjectId.isValid(id)
+    ) {
+      return res.status(400).json({
+        message: "Invalid note ID",
+      });
+    }
+
+    /*
+    -----------------------------------------------
+    FIND NOTE
+    -----------------------------------------------
+    */
+
+    const note =
+      await Note.findById(id)
+        .populate(
+          "subject",
+          "name code semester"
+        )
+        .populate(
+          "uploadedBy",
+          "name email"
+        );
+
+    if (!note) {
+      return res.status(404).json({
+        message: "Note not found",
+      });
+    }
+
+    /*
+    -----------------------------------------------
+    ONLY PENDING NOTES
+    -----------------------------------------------
+    */
+
+    if (note.status !== "PENDING") {
+      return res.status(400).json({
+        message:
+          "Only pending notes can be previewed for moderation",
+      });
+    }
+
+    /*
+    -----------------------------------------------
+    MASTER
+    -----------------------------------------------
+    */
+
+    if (req.user.role === "master") {
+      return res.status(200).json({
+        note,
+      });
+    }
+
+    /*
+    -----------------------------------------------
+    ADMIN PERMISSION
+    -----------------------------------------------
+    */
+
+    if (
+      req.user.role !== "admin"
+    ) {
+      return res.status(403).json({
+        message:
+          "You do not have permission to review notes",
+      });
+    }
+
+    if (
+      !req.user.permissions?.approveNotes
+    ) {
+      return res.status(403).json({
+        message:
+          "You do not have permission to review notes",
+      });
+    }
+
+    /*
+    -----------------------------------------------
+    ADMIN SUBJECT ACCESS
+    -----------------------------------------------
+    */
+
+    const hasSubjectAccess =
+      req.user.assignedSubjects?.some(
+        (subjectId) =>
+          subjectId.toString() ===
+          note.subject._id.toString()
+      );
+
+    if (!hasSubjectAccess) {
+      return res.status(403).json({
+        message:
+          "You do not have access to this subject",
+      });
+    }
+
+    return res.status(200).json({
+      note,
+    });
+  } catch (error) {
+    console.error(
+      "Preview note for admin error:",
+      error
+    );
+
+    return res.status(500).json({
+      message:
+        "Failed to preview note",
+    });
+  }
+};
+
+/*
+==================================================
+READ PENDING NOTE FOR ADMIN
+GET /api/admin/notes/:id/read
+
+Allows Admin/Master to view a pending PDF.
+
+Does NOT increase downloadCount.
+==================================================
+*/
+
+const readPendingNote = async (
+  req,
+  res
+) => {
+  try {
+    const { id } = req.params;
+
+    /*
+    -----------------------------------------------
+    VALIDATE ID
+    -----------------------------------------------
+    */
+
+    if (
+      !mongoose.Types.ObjectId.isValid(id)
+    ) {
+      return res.status(400).json({
+        message: "Invalid note ID",
+      });
+    }
+
+    /*
+    -----------------------------------------------
+    FIND NOTE
+    -----------------------------------------------
+    */
+
+    const note =
+      await Note.findById(id);
+
+    if (!note) {
+      return res.status(404).json({
+        message: "Note not found",
+      });
+    }
+
+    /*
+    -----------------------------------------------
+    ONLY PENDING NOTES
+    -----------------------------------------------
+    */
+
+    if (note.status !== "PENDING") {
+      return res.status(400).json({
+        message:
+          "Only pending notes can be reviewed",
+      });
+    }
+
+    /*
+    -----------------------------------------------
+    MASTER
+    -----------------------------------------------
+    */
+
+    if (
+      req.user.role === "master"
+    ) {
+      // Master has access to all notes.
+    }
+
+    /*
+    -----------------------------------------------
+    ADMIN
+    -----------------------------------------------
+    */
+
+    else {
+      if (
+        req.user.role !== "admin"
+      ) {
+        return res.status(403).json({
+          message:
+            "You do not have permission to review notes",
+        });
+      }
+
+      /*
+      Admin needs approveNotes permission.
+      */
+
+      if (
+        !req.user.permissions?.approveNotes
+      ) {
+        return res.status(403).json({
+          message:
+            "You do not have permission to review notes",
+        });
+      }
+
+      /*
+      ---------------------------------------------
+      ADMIN SUBJECT ACCESS
+      ---------------------------------------------
+      */
+
+      const hasSubjectAccess =
+        req.user.assignedSubjects?.some(
+          (subjectId) =>
+            subjectId.toString() ===
+            note.subject.toString()
+        );
+
+      if (!hasSubjectAccess) {
+        return res.status(403).json({
+          message:
+            "You do not have access to this subject",
+        });
+      }
+    }
+
+    /*
+    -----------------------------------------------
+    CHECK PDF
+    -----------------------------------------------
+    */
+
+    if (
+      !note.fileUrl ||
+      !fs.existsSync(note.fileUrl)
+    ) {
+      return res.status(404).json({
+        message: "PDF file not found",
+      });
+    }
+
+    /*
+    -----------------------------------------------
+    STREAM PDF
+    -----------------------------------------------
+    */
+
+    res.setHeader(
+      "Content-Type",
+      "application/pdf"
+    );
+
+    res.setHeader(
+      "Content-Disposition",
+      `inline; filename="${note.fileName}"`
+    );
+
+    const fileStream =
+      fs.createReadStream(
+        note.fileUrl
+      );
+
+    fileStream.on(
+      "error",
+      (error) => {
+        console.error(
+          "Pending PDF read stream error:",
+          error
+        );
+
+        if (!res.headersSent) {
+          res.status(500).json({
+            message:
+              "Failed to read PDF",
+          });
+        }
+      }
+    );
+
+    fileStream.pipe(res);
+  } catch (error) {
+    console.error(
+      "Read pending note error:",
+      error
+    );
+
+    if (!res.headersSent) {
+      return res.status(500).json({
+        message:
+          "Failed to read pending note",
+      });
+    }
+  }
+};
+
+/*
+==================================================
+EXPORT CONTROLLERS
+==================================================
+*/
+
 module.exports = {
   getNotes,
   getMyNotes,
+  deleteMyNote,
   getNoteById,
   readNote,
   downloadNote,
   createNote,
   createNoteVersion,
-  deleteMyNote,
+
+  // Admin moderation
+  previewNoteForAdmin,
+  readPendingNote,
 };

@@ -2,33 +2,93 @@ const mongoose = require("mongoose");
 
 const Note = require("../models/Note");
 
+/*
+==================================================
+CHECK WHETHER ADMIN CAN ACCESS NOTE'S SUBJECT
+==================================================
+*/
 
-// Check whether Admin can access a note's subject
 const hasSubjectAccess = (admin, note) => {
+  // Master has access to every subject.
   if (admin.role === "master") {
     return true;
   }
 
-  return admin.assignedSubjects.some(
+  // Only Admin should reach this point.
+  if (admin.role !== "admin") {
+    return false;
+  }
+
+  // Safely get assigned subjects.
+  const assignedSubjects =
+    admin.assignedSubjects || [];
+
+  /*
+  --------------------------------------------------
+  IMPORTANT
+
+  note.subject may be:
+
+  1. ObjectId
+     OR
+  2. Populated subject object
+
+  So we normalize it first.
+  --------------------------------------------------
+  */
+
+  const noteSubjectId =
+    note.subject?._id
+      ? note.subject._id.toString()
+      : note.subject?.toString();
+
+  if (!noteSubjectId) {
+    return false;
+  }
+
+  return assignedSubjects.some(
     (subjectId) =>
       subjectId.toString() ===
-      note.subject.toString()
+      noteSubjectId
   );
 };
 
 
-// Get pending notes
+/*
+==================================================
+GET PENDING NOTES
+GET /api/admin/notes/pending
+==================================================
+*/
+
 const getPendingNotes = async (req, res) => {
   try {
     const admin = req.user;
 
-    if (admin.role !== "admin" && admin.role !== "master") {
+    /*
+    --------------------------------------------------
+    CHECK ROLE
+    --------------------------------------------------
+    */
+
+    if (
+      admin.role !== "admin" &&
+      admin.role !== "master"
+    ) {
       return res.status(403).json({
         message: "Admin access required",
       });
     }
 
-    // Master can see everything
+    /*
+    --------------------------------------------------
+    MASTER
+    --------------------------------------------------
+
+    Master can see all pending notes.
+    --------------------------------------------------
+    */
+
     if (admin.role === "master") {
       const notes = await Note.find({
         status: "PENDING",
@@ -45,17 +105,29 @@ const getPendingNotes = async (req, res) => {
           createdAt: -1,
         });
 
-      return res.json({
+      return res.status(200).json({
         count: notes.length,
         notes,
       });
     }
 
-    // Admin can only see assigned subjects
+    /*
+    --------------------------------------------------
+    ADMIN
+    --------------------------------------------------
+
+    Admin can only see notes belonging to
+    assigned subjects.
+    --------------------------------------------------
+    */
+
+    const assignedSubjects =
+      admin.assignedSubjects || [];
+
     const notes = await Note.find({
       status: "PENDING",
       subject: {
-        $in: admin.assignedSubjects,
+        $in: assignedSubjects,
       },
     })
       .populate(
@@ -70,7 +142,7 @@ const getPendingNotes = async (req, res) => {
         createdAt: -1,
       });
 
-    res.json({
+    return res.status(200).json({
       count: notes.length,
       notes,
     });
@@ -81,23 +153,43 @@ const getPendingNotes = async (req, res) => {
       error
     );
 
-    res.status(500).json({
+    return res.status(500).json({
       message: "Failed to fetch pending notes",
     });
   }
 };
 
 
-// Get one note for review
+/*
+==================================================
+GET ONE NOTE FOR REVIEW
+GET /api/admin/notes/:id
+==================================================
+*/
+
 const getNoteForReview = async (req, res) => {
   try {
     const { id } = req.params;
 
-    if (!mongoose.Types.ObjectId.isValid(id)) {
+    /*
+    --------------------------------------------------
+    VALIDATE ID
+    --------------------------------------------------
+    */
+
+    if (
+      !mongoose.Types.ObjectId.isValid(id)
+    ) {
       return res.status(400).json({
         message: "Invalid note ID",
       });
     }
+
+    /*
+    --------------------------------------------------
+    FIND NOTE
+    --------------------------------------------------
+    */
 
     const note = await Note.findById(id)
       .populate(
@@ -115,15 +207,38 @@ const getNoteForReview = async (req, res) => {
       });
     }
 
-    // Check subject access for Admin
-    if (!hasSubjectAccess(req.user, note)) {
+    /*
+    --------------------------------------------------
+    ONLY PENDING NOTES CAN BE REVIEWED
+    --------------------------------------------------
+    */
+
+    if (note.status !== "PENDING") {
+      return res.status(400).json({
+        message:
+          "Only pending notes can be reviewed",
+      });
+    }
+
+    /*
+    --------------------------------------------------
+    CHECK SUBJECT ACCESS
+    --------------------------------------------------
+    */
+
+    if (
+      !hasSubjectAccess(
+        req.user,
+        note
+      )
+    ) {
       return res.status(403).json({
         message:
           "You do not have access to this subject",
       });
     }
 
-    res.json({
+    return res.status(200).json({
       note,
     });
 
@@ -133,26 +248,46 @@ const getNoteForReview = async (req, res) => {
       error
     );
 
-    res.status(500).json({
+    return res.status(500).json({
       message: "Failed to fetch note",
     });
   }
 };
 
 
-// Approve note
+/*
+==================================================
+APPROVE NOTE
+PUT /api/admin/notes/:id/approve
+==================================================
+*/
+
 const approveNote = async (req, res) => {
   try {
     const { id } = req.params;
 
-    // Validate Note ID
-    if (!mongoose.Types.ObjectId.isValid(id)) {
+    /*
+    --------------------------------------------------
+    VALIDATE ID
+    --------------------------------------------------
+    */
+
+    if (
+      !mongoose.Types.ObjectId.isValid(id)
+    ) {
       return res.status(400).json({
         message: "Invalid note ID",
       });
     }
 
-    const note = await Note.findById(id);
+    /*
+    --------------------------------------------------
+    FIND NOTE
+    --------------------------------------------------
+    */
+
+    const note =
+      await Note.findById(id);
 
     if (!note) {
       return res.status(404).json({
@@ -160,84 +295,194 @@ const approveNote = async (req, res) => {
       });
     }
 
-    // Check permission
-    const isMaster = req.user.role === "master";
+    /*
+    --------------------------------------------------
+    ONLY PENDING NOTES CAN BE APPROVED
+    --------------------------------------------------
+    */
+
+    if (note.status !== "PENDING") {
+      return res.status(400).json({
+        message:
+          `Note cannot be approved because its status is ${note.status}`,
+      });
+    }
+
+    /*
+    --------------------------------------------------
+    CHECK APPROVAL PERMISSION
+    --------------------------------------------------
+    */
+
+    const isMaster =
+      req.user.role === "master";
+
     const canApprove =
-      isMaster || req.user.permissions?.approveNotes === true;
+      isMaster ||
+      (
+        req.user.role === "admin" &&
+        req.user.permissions?.approveNotes === true
+      );
 
     if (!canApprove) {
       return res.status(403).json({
-        message: "You do not have permission to approve notes",
+        message:
+          "You do not have permission to approve notes",
       });
     }
 
-    // Check subject access for Admin
-    if (!isMaster && !hasSubjectAccess(req.user, note)) {
+    /*
+    --------------------------------------------------
+    CHECK SUBJECT ACCESS
+    --------------------------------------------------
+    */
+
+    if (
+      !hasSubjectAccess(
+        req.user,
+        note
+      )
+    ) {
       return res.status(403).json({
-        message: "You do not have access to this subject",
+        message:
+          "You do not have access to this subject",
       });
     }
 
-    // Only pending notes can be approved
-    if (note.status !== "PENDING") {
-      return res.status(400).json({
-        message: `Note cannot be approved because its status is ${note.status}`,
+    /*
+    --------------------------------------------------
+    FIND CURRENT VERSION
+    --------------------------------------------------
+
+    If this is a new version of an existing note,
+    the previous approved version will be current.
+
+    Example:
+
+    v1 APPROVED + CURRENT
+    v2 PENDING
+
+    Approving v2 means:
+
+    v1 → OUTDATED
+    v2 → APPROVED + CURRENT
+    --------------------------------------------------
+    */
+
+    const currentVersion =
+      await Note.findOne({
+        noteSeriesId:
+          note.noteSeriesId,
+
+        isCurrent: true,
+
+        _id: {
+          $ne: note._id,
+        },
       });
-    }
 
-    // Find currently active version in this note series
-    const currentVersion = await Note.findOne({
-      noteSeriesId: note.noteSeriesId,
-      isCurrent: true,
-      _id: { $ne: note._id },
-    });
+    /*
+    --------------------------------------------------
+    MARK OLD VERSION OUTDATED
+    --------------------------------------------------
+    */
 
-    // If an older version exists, mark it outdated
     if (currentVersion) {
-      currentVersion.status = "OUTDATED";
-      currentVersion.isCurrent = false;
+      currentVersion.status =
+        "OUTDATED";
+
+      currentVersion.isCurrent =
+        false;
 
       await currentVersion.save();
     }
 
-    // Approve the new version
-    note.status = "APPROVED";
-    note.isCurrent = true;
+    /*
+    --------------------------------------------------
+    APPROVE NEW VERSION
+    --------------------------------------------------
+    */
 
-    note.approvedBy = req.user._id;
-    note.approvedAt = new Date();
+    note.status =
+      "APPROVED";
 
-    // Clear rejection information
-    note.rejectionReason = null;
-    note.rejectedBy = null;
-    note.rejectedAt = null;
+    note.isCurrent =
+      true;
+
+    note.approvedBy =
+      req.user._id;
+
+    note.approvedAt =
+      new Date();
+
+    /*
+    --------------------------------------------------
+    CLEAR OLD REJECTION INFORMATION
+    --------------------------------------------------
+    */
+
+    note.rejectionReason =
+      null;
+
+    note.rejectedBy =
+      null;
+
+    note.rejectedAt =
+      null;
 
     await note.save();
 
+    /*
+    --------------------------------------------------
+    RESPONSE
+    --------------------------------------------------
+    */
+
     return res.status(200).json({
-      message: "Note approved successfully",
+      message:
+        "Note approved successfully",
+
       note: {
         id: note._id,
-        status: note.status,
-        version: note.version,
-        isCurrent: note.isCurrent,
-        approvedBy: note.approvedBy,
-        approvedAt: note.approvedAt,
+
+        status:
+          note.status,
+
+        version:
+          note.version,
+
+        isCurrent:
+          note.isCurrent,
+
+        approvedBy:
+          note.approvedBy,
+
+        approvedAt:
+          note.approvedAt,
       },
     });
 
   } catch (error) {
-    console.error("APPROVE NOTE ERROR:", error);
+    console.error(
+      "APPROVE NOTE ERROR:",
+      error
+    );
 
     return res.status(500).json({
-      message: "Failed to approve note",
-      error: error.message,
+      message:
+        "Failed to approve note",
     });
   }
 };
 
 
-// Reject note
+/*
+==================================================
+REJECT NOTE
+PUT /api/admin/notes/:id/reject
+==================================================
+*/
+
 const rejectNote = async (req, res) => {
   try {
     const { id } = req.params;
@@ -246,20 +491,59 @@ const rejectNote = async (req, res) => {
       rejectionReason,
     } = req.body;
 
-    if (!mongoose.Types.ObjectId.isValid(id)) {
+    /*
+    --------------------------------------------------
+    VALIDATE ID
+    --------------------------------------------------
+    */
+
+    if (
+      !mongoose.Types.ObjectId.isValid(id)
+    ) {
       return res.status(400).json({
         message: "Invalid note ID",
       });
     }
 
-    if (!rejectionReason?.trim()) {
+    /*
+    --------------------------------------------------
+    VALIDATE REJECTION REASON
+    --------------------------------------------------
+    */
+
+    if (
+      !rejectionReason ||
+      !rejectionReason.trim()
+    ) {
       return res.status(400).json({
         message:
           "Rejection reason is required",
       });
     }
 
-    const note = await Note.findById(id);
+    /*
+    --------------------------------------------------
+    LIMIT REJECTION REASON
+    --------------------------------------------------
+    */
+
+    if (
+      rejectionReason.trim().length > 500
+    ) {
+      return res.status(400).json({
+        message:
+          "Rejection reason cannot exceed 500 characters",
+      });
+    }
+
+    /*
+    --------------------------------------------------
+    FIND NOTE
+    --------------------------------------------------
+    */
+
+    const note =
+      await Note.findById(id);
 
     if (!note) {
       return res.status(404).json({
@@ -267,26 +551,12 @@ const rejectNote = async (req, res) => {
       });
     }
 
-    // Check permission
-    if (
-      req.user.role !== "master" &&
-      !req.user.permissions?.rejectNotes
-    ) {
-      return res.status(403).json({
-        message:
-          "You do not have permission to reject notes",
-      });
-    }
+    /*
+    --------------------------------------------------
+    ONLY PENDING NOTES CAN BE REJECTED
+    --------------------------------------------------
+    */
 
-    // Check subject access
-    if (!hasSubjectAccess(req.user, note)) {
-      return res.status(403).json({
-        message:
-          "You do not have access to this subject",
-      });
-    }
-
-    // Only pending notes can be rejected
     if (note.status !== "PENDING") {
       return res.status(400).json({
         message:
@@ -294,23 +564,115 @@ const rejectNote = async (req, res) => {
       });
     }
 
-    note.status = "REJECTED";
+    /*
+    --------------------------------------------------
+    CHECK REJECTION PERMISSION
+    --------------------------------------------------
+    */
+
+    const isMaster =
+      req.user.role === "master";
+
+    const canReject =
+      isMaster ||
+      (
+        req.user.role === "admin" &&
+        req.user.permissions?.rejectNotes === true
+      );
+
+    if (!canReject) {
+      return res.status(403).json({
+        message:
+          "You do not have permission to reject notes",
+      });
+    }
+
+    /*
+    --------------------------------------------------
+    CHECK SUBJECT ACCESS
+    --------------------------------------------------
+    */
+
+    if (
+      !hasSubjectAccess(
+        req.user,
+        note
+      )
+    ) {
+      return res.status(403).json({
+        message:
+          "You do not have access to this subject",
+      });
+    }
+
+    /*
+    --------------------------------------------------
+    REJECT NOTE
+    --------------------------------------------------
+    */
+
+    note.status =
+      "REJECTED";
+
+    note.isCurrent =
+      false;
+
     note.rejectionReason =
       rejectionReason.trim();
 
-    note.approvedBy = null;
-    note.approvedAt = null;
+    /*
+    --------------------------------------------------
+    CLEAR APPROVAL INFORMATION
+    --------------------------------------------------
+    */
+
+    note.approvedBy =
+      null;
+
+    note.approvedAt =
+      null;
+
+    /*
+    --------------------------------------------------
+    STORE REJECTION INFORMATION
+    --------------------------------------------------
+    */
+
+    note.rejectedBy =
+      req.user._id;
+
+    note.rejectedAt =
+      new Date();
 
     await note.save();
 
-    res.json({
-      message: "Note rejected successfully",
+    /*
+    --------------------------------------------------
+    RESPONSE
+    --------------------------------------------------
+    */
+
+    return res.status(200).json({
+      message:
+        "Note rejected successfully",
 
       note: {
         id: note._id,
-        status: note.status,
+
+        status:
+          note.status,
+
+        isCurrent:
+          note.isCurrent,
+
         rejectionReason:
           note.rejectionReason,
+
+        rejectedBy:
+          note.rejectedBy,
+
+        rejectedAt:
+          note.rejectedAt,
       },
     });
 
@@ -320,12 +682,19 @@ const rejectNote = async (req, res) => {
       error
     );
 
-    res.status(500).json({
-      message: "Failed to reject note",
+    return res.status(500).json({
+      message:
+        "Failed to reject note",
     });
   }
 };
 
+
+/*
+==================================================
+EXPORT
+==================================================
+*/
 
 module.exports = {
   getPendingNotes,
