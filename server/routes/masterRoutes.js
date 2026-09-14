@@ -4,6 +4,16 @@ const protect = require("../middleware/authMiddleware");
 const masterOnly = require("../middleware/masterMiddleware");
 
 const {
+  getMasterDashboardStats,
+} = require("../controllers/masterDashboardController");
+
+const {
+  getAllUsers,
+  changeUserRole,
+  toggleUserStatus,
+} = require("../controllers/masterUserController");
+
+const {
   getAllSubjects,
   createSubject,
   updateSubject,
@@ -37,6 +47,13 @@ router.get(
       },
     });
   }
+);
+
+router.get(
+  "/dashboard/stats",
+  protect,
+  masterOnly,
+  getMasterDashboardStats
 );
 
 // Assign subjects to Admin
@@ -119,6 +136,34 @@ router.put(
   protect,
   masterOnly,
   toggleSubjectStatus
+);
+
+// =====================================================
+// USER MANAGEMENT
+// =====================================================
+
+// Get all users
+router.get(
+  "/users",
+  protect,
+  masterOnly,
+  getAllUsers
+);
+
+// Change user role
+router.put(
+  "/users/:id/role",
+  protect,
+  masterOnly,
+  changeUserRole
+);
+
+// Enable / disable user
+router.put(
+  "/users/:id/toggle-status",
+  protect,
+  masterOnly,
+  toggleUserStatus
 );
 
 module.exports = router;

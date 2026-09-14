@@ -690,6 +690,73 @@ const rejectNote = async (req, res) => {
 };
 
 
+const getManageNotes = async (req, res) => {
+  try {
+    const admin = req.user;
+
+    if (
+      admin.role !== "admin" &&
+      admin.role !== "master"
+    ) {
+      return res.status(403).json({
+        message: "Admin access required",
+      });
+    }
+
+    let query = {};
+
+    // Master can see every note
+    if (admin.role === "master") {
+      query = {};
+    } else {
+      // Admin can see only notes
+      // belonging to assigned subjects
+      query = {
+        subject: {
+          $in: admin.assignedSubjects || [],
+        },
+      };
+    }
+
+    const notes = await Note.find(query)
+      .populate(
+        "subject",
+        "name code semester"
+      )
+      .populate(
+        "uploadedBy",
+        "name email"
+      )
+      .populate(
+        "approvedBy",
+        "name email"
+      )
+      .populate(
+        "rejectedBy",
+        "name email"
+      )
+      .sort({
+        createdAt: -1,
+      });
+
+    return res.status(200).json({
+      count: notes.length,
+      notes,
+    });
+  } catch (error) {
+    console.error(
+      "Get manage notes error:",
+      error
+    );
+
+    return res.status(500).json({
+      message:
+        "Failed to fetch notes",
+    });
+  }
+};
+
+
 /*
 ==================================================
 EXPORT
@@ -701,4 +768,5 @@ module.exports = {
   getNoteForReview,
   approveNote,
   rejectNote,
+  getManageNotes,
 };

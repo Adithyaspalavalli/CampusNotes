@@ -56,8 +56,29 @@ function Navbar() {
           )}
 
           {user?.role === "master" && (
-            <Link to="/master">
-              Master
+            <>
+              <Link to="/master">
+                Master
+              </Link>
+
+              <Link to="/master/users">
+                Users
+              </Link>
+
+              <Link to="/master/admins">
+                Admins
+              </Link>
+
+              <Link to="/master/subjects">
+                Subjects
+              </Link>
+            </>
+          )}
+
+          {(user?.role === "admin" ||
+            user?.role === "master") && (
+            <Link to="/admin/notes/manage">
+              Manage Notes
             </Link>
           )}
 
@@ -130,11 +151,30 @@ function Navbar() {
 
 
           {user?.role === "master" && (
+            <>
+              <Link
+                to="/master"
+                onClick={closeMenu}
+              >
+                👑 Master Dashboard
+              </Link>
+
+              <Link
+                to="/master/users"
+                onClick={closeMenu}
+              >
+                Users
+              </Link>
+            </>
+          )}
+
+          {(user?.role === "admin" ||
+            user?.role === "master") && (
             <Link
-              to="/master"
+              to="/admin/notes/manage"
               onClick={closeMenu}
             >
-              👑 Master Dashboard
+              Manage Notes
             </Link>
           )}
 

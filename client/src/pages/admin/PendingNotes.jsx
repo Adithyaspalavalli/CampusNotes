@@ -9,8 +9,41 @@ function PendingNotes() {
   const navigate = useNavigate();
 
   const [notes, setNotes] = useState([]);
+  const [currentUser, setCurrentUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+
+  useEffect(() => {
+    const loadData = async () => {
+      try {
+        setLoading(true);
+        setError("");
+
+        const [userResponse, notesResponse] =
+          await Promise.all([
+            api.get("/auth/me"),
+            api.get("/admin/notes/pending"),
+          ]);
+
+        setCurrentUser(userResponse.data.user);
+        setNotes(notesResponse.data.notes || []);
+      } catch (error) {
+        console.error(
+          "Failed to load pending notes:",
+          error
+        );
+
+        setError(
+          error.response?.data?.message ||
+            "Failed to load pending notes."
+        );
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadData();
+  }, []);
 
   const fetchPendingNotes = async () => {
     try {
@@ -35,12 +68,49 @@ function PendingNotes() {
     }
   };
 
-  useEffect(() => {
-    fetchPendingNotes();
-  }, []);
+  const isMaster =
+    currentUser?.role === "master";
+
+  const canApproveNotes =
+    isMaster ||
+    currentUser?.permissions?.approveNotes === true;
+
+  const canRejectNotes =
+    isMaster ||
+    currentUser?.permissions?.rejectNotes === true;
+
+  const canModerate =
+    canApproveNotes || canRejectNotes;
 
   const handleReview = (noteId) => {
     navigate(`/admin/notes/${noteId}`);
+  };
+
+  const handleDelete = async (noteId) => {
+    const confirmed = window.confirm(
+      "Are you sure you want to delete this note? This action cannot be undone."
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    try {
+      await api.delete(`/notes/${noteId}`);
+
+      setNotes((currentNotes) =>
+        currentNotes.filter(
+          (note) => note._id !== noteId
+        )
+      );
+    } catch (error) {
+      console.error("Delete note error:", error);
+
+      alert(
+        error.response?.data?.message ||
+          "Failed to delete note."
+      );
+    }
   };
 
   if (loading) {
@@ -175,19 +245,38 @@ function PendingNotes() {
                   </div>
 
                   <div className="admin-note-actions">
+                    {canReview && (
+                      <button
+                        className="admin-review-button"
+                        onClick={() =>
+                          handleReview(note._id)
+                        }
+                      >
+                        Review Note
+                      </button>
+                    )}
+
                     <button
-                      className="admin-review-button"
+                      className="admin-delete-button"
                       onClick={() =>
-                        handleReview(note._id)
+                        handleDelete(note._id)
                       }
                     >
-                      Review Note
+                      🗑 Delete
                     </button>
                   </div>
                 </div>
               ))}
             </div>
           )}
+
+          {currentUser?.role === "admin" &&
+            !canModerate && (
+              <div className="dashboard-info">
+                You do not have permission to approve
+                or reject notes.
+              </div>
+            )}
         </div>
       </PageContainer>
     </>

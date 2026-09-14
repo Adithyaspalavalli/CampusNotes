@@ -188,11 +188,13 @@ function AdminReadNote() {
             <button
               onClick={() =>
                 navigate(
-                  `/admin/notes/${id}`
+                  note?.status === "PENDING"
+                    ? `/admin/notes/${id}`
+                    : `/admin/notes/manage`
                 )
               }
             >
-              ← Back to Review
+              ← Back
             </button>
           </div>
         </PageContainer>
@@ -242,11 +244,16 @@ function AdminReadNote() {
               className="admin-reader-back-button"
               onClick={() =>
                 navigate(
-                  `/admin/notes/${id}`
+                  note.status === "PENDING"
+                    ? `/admin/notes/${id}`
+                    : `/admin/notes/manage`
                 )
               }
             >
-              ← Back to Review
+              ←{" "}
+              {note.status === "PENDING"
+                ? "Back to Review"
+                : "Back to Manage Notes"}
             </button>
 
             <div className="admin-reader-title">
@@ -260,8 +267,16 @@ function AdminReadNote() {
               </p>
             </div>
 
-            <span className="note-status status-pending">
-              Pending Review
+            <span
+              className={`note-status ${
+                note.status === "APPROVED"
+                  ? "status-approved"
+                  : "status-pending"
+              }`}
+            >
+              {note.status === "APPROVED"
+                ? "Approved"
+                : "Pending Review"}
             </span>
           </div>
 

@@ -75,7 +75,7 @@ const userSchema = new mongoose.Schema(
 
       viewStatistics: {
         type: Boolean,
-        default: true,
+        default: false,
       },
     },
 

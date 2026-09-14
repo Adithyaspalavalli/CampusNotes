@@ -9,6 +9,7 @@ const {
   getNoteForReview,
   approveNote,
   rejectNote,
+  getManageNotes,
 } = require("../controllers/adminNoteController");
 
 // Note controller functions for PDF preview
@@ -18,6 +19,13 @@ const {
 } = require("../controllers/noteController");
 
 const router = express.Router();
+
+router.get(
+  "/",
+  protect,
+  adminOnly,
+  getManageNotes
+);
 
 /*
 ==================================================
@@ -31,6 +39,13 @@ router.get(
   protect,
   adminOnly,
   getPendingNotes
+);
+
+router.get(
+  "/manage",
+  protect,
+  adminOnly,
+  getManageNotes
 );
 
 /*

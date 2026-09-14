@@ -21,9 +21,13 @@ import AdminDashboard from "./pages/admin/AdminDashboard";
 import PendingNotes from "./pages/admin/PendingNotes";
 import ReviewNote from "./pages/admin/ReviewNote";
 import AdminReadNote from "./pages/admin/AdminReadNote";
+import ManageNotes from "./pages/admin/ManageNotes";
 
 // Master pages
 import MasterDashboard from "./pages/master/MasterDashboard";
+import ManageUsers from "./pages/master/ManageUsers";
+import ManageSubjects from "./pages/master/ManageSubjects";
+import ManageAdmins from "./pages/master/ManageAdmins";
 
 // Authentication / authorization
 import ProtectedRoute from "./components/ProtectedRoute";
@@ -195,6 +199,18 @@ function App() {
         />
 
 
+        <Route
+          path="/admin/notes/manage"
+          element={
+            <ProtectedRoute
+              allowedRoles={["admin", "master"]}
+            >
+              <ManageNotes />
+            </ProtectedRoute>
+          }
+        />
+
+
         {/* =========================================
             ADMIN - REVIEW NOTE
             Admin + Master
@@ -244,6 +260,33 @@ function App() {
               allowedRoles={["master"]}
             >
               <MasterDashboard />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/master/users"
+          element={
+            <ProtectedRoute allowedRoles={["master"]}>
+              <ManageUsers />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/master/subjects"
+          element={
+            <ProtectedRoute allowedRoles={["master"]}>
+              <ManageSubjects />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/master/admins"
+          element={
+            <ProtectedRoute allowedRoles={["master"]}>
+              <ManageAdmins />
             </ProtectedRoute>
           }
         />

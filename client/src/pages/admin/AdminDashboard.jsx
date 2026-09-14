@@ -1,306 +1,281 @@
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
-
-import Navbar from "../../components/Navbar";
-import PageContainer from "../../components/PageContainer";
+import { Link } from "react-router-dom";
 import api from "../../services/api";
 
 function AdminDashboard() {
-  const navigate = useNavigate();
+  const [user, setUser] = useState(null);
+  const [statistics, setStatistics] = useState(null);
 
-  const [pendingCount, setPendingCount] = useState(0);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
+  const [statsError, setStatsError] = useState("");
 
   useEffect(() => {
-    const fetchPendingCount = async () => {
+    const loadDashboard = async () => {
       try {
         setLoading(true);
-        setError("");
 
-        const response = await api.get(
-          "/admin/notes/pending"
-        );
+        // Get current user
+        const userResponse = await api.get("/auth/me");
 
-        setPendingCount(
-          response.data.count || 0
-        );
+        setUser(userResponse.data.user);
+
+        // Get statistics
+        try {
+          const statsResponse = await api.get(
+            "/admin/dashboard/stats"
+          );
+
+          setStatistics(statsResponse.data.statistics);
+          setStatsError("");
+        } catch (error) {
+          if (error.response?.status === 403) {
+            setStatsError(
+              "You do not have permission to view statistics."
+            );
+          } else {
+            setStatsError(
+              error.response?.data?.message ||
+                "Failed to load statistics."
+            );
+          }
+        }
       } catch (error) {
-        console.error(
-          "Failed to fetch pending notes:",
-          error
-        );
+        console.error("Dashboard error:", error);
 
-        setError(
+        setStatsError(
           error.response?.data?.message ||
-            "Failed to load dashboard information"
+            "Failed to load dashboard."
         );
       } finally {
         setLoading(false);
       }
     };
 
-    fetchPendingCount();
+    loadDashboard();
   }, []);
 
+  if (loading) {
+    return (
+      <div className="page-container">
+        <div className="admin-dashboard-page">
+          <div className="dashboard-loading">
+            Loading dashboard...
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  const isMaster = user?.role === "master";
+  const canViewStatistics =
+    isMaster || user?.permissions?.viewStatistics === true;
+
   return (
-    <>
-      <Navbar />
+    <div className="page-container">
+      <div className="admin-dashboard-page">
 
-      <PageContainer>
-        <div className="admin-dashboard">
+      {/* Header */}
+      <div className="admin-dashboard-header">
+        <div>
+          <h1>Admin Dashboard</h1>
 
-          {/* =====================================
-              HEADER
-          ===================================== */}
+          <p>
+            Welcome back,{" "}
+            <strong>{user?.name || "Admin"}</strong>
+          </p>
+        </div>
 
-          <div className="admin-dashboard-header">
+        <div className="admin-role-badge">
+          {isMaster ? "MASTER" : "ADMIN"}
+        </div>
+      </div>
+
+      {/* Assigned Subjects */}
+      <section className="dashboard-section">
+        <div className="section-heading">
+          <h2>Assigned Subjects</h2>
+          <span>
+            {user?.assignedSubjects?.length || 0}
+          </span>
+        </div>
+
+        {user?.assignedSubjects?.length > 0 ? (
+          <div className="assigned-subjects">
+            {user.assignedSubjects.map((subject) => (
+              <div
+                className="assigned-subject-card"
+                key={subject._id}
+              >
+                <strong>{subject.name}</strong>
+
+                <span>
+                  {subject.code} · Semester{" "}
+                  {subject.semester}
+                </span>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="empty-dashboard-message">
+            No subjects have been assigned to you.
+          </div>
+        )}
+      </section>
+
+      {/* Statistics */}
+      {canViewStatistics && (
+        <section className="dashboard-section">
+          <div className="section-heading">
             <div>
-              <h1>Admin Dashboard</h1>
-
-              <p>
-                Manage and review notes assigned
-                to you.
-              </p>
+              <h2>Statistics</h2>
+              <p>Overview of your accessible notes.</p>
             </div>
           </div>
 
+          {statsError ? (
+            <div className="dashboard-error">
+              {statsError}
+            </div>
+          ) : statistics ? (
+            <div className="statistics-grid">
 
-          {/* =====================================
-              ERROR
-          ===================================== */}
+              <div className="stat-card">
+                <span className="stat-label">
+                  Total Notes
+                </span>
+                <strong className="stat-value">
+                  {statistics.totalNotes}
+                </strong>
+              </div>
 
-          {error && (
-            <div className="admin-dashboard-error">
-              <strong>Unable to load dashboard</strong>
+              <div className="stat-card">
+                <span className="stat-label">
+                  Approved
+                </span>
+                <strong className="stat-value">
+                  {statistics.approvedNotes}
+                </strong>
+              </div>
 
-              <p>{error}</p>
+              <div className="stat-card">
+                <span className="stat-label">
+                  Current Approved
+                </span>
+                <strong className="stat-value">
+                  {statistics.currentApprovedNotes}
+                </strong>
+              </div>
+
+              <div className="stat-card">
+                <span className="stat-label">
+                  Pending
+                </span>
+                <strong className="stat-value">
+                  {statistics.pendingNotes}
+                </strong>
+              </div>
+
+              <div className="stat-card">
+                <span className="stat-label">
+                  Rejected
+                </span>
+                <strong className="stat-value">
+                  {statistics.rejectedNotes}
+                </strong>
+              </div>
+
+              <div className="stat-card">
+                <span className="stat-label">
+                  Outdated
+                </span>
+                <strong className="stat-value">
+                  {statistics.outdatedNotes}
+                </strong>
+              </div>
+
+              <div className="stat-card downloads-card">
+                <span className="stat-label">
+                  Total Downloads
+                </span>
+                <strong className="stat-value">
+                  {statistics.totalDownloads}
+                </strong>
+              </div>
+
+            </div>
+          ) : (
+            <div className="empty-dashboard-message">
+              Statistics are not available.
             </div>
           )}
+        </section>
+      )}
 
+      {/* Statistics permission message */}
+      {!canViewStatistics && (
+        <div className="dashboard-info">
+          Statistics are not available because your account
+          does not have the <strong>View Statistics</strong>{" "}
+          permission.
+        </div>
+      )}
 
-          {/* =====================================
-              STATISTICS
-          ===================================== */}
-
-          <div className="admin-dashboard-stats">
-
-            {/* Pending */}
-
-            <div className="admin-stat-card pending-stat">
-              <div className="admin-stat-icon">
-                📋
-              </div>
-
-              <div>
-                <span className="admin-stat-label">
-                  Pending Notes
-                </span>
-
-                <strong className="admin-stat-number">
-                  {loading ? "..." : pendingCount}
-                </strong>
-
-                <span className="admin-stat-description">
-                  Waiting for review
-                </span>
-              </div>
-            </div>
-
-
-            {/* Assigned Subjects */}
-
-            <div className="admin-stat-card">
-              <div className="admin-stat-icon">
-                📚
-              </div>
-
-              <div>
-                <span className="admin-stat-label">
-                  Assigned Subjects
-                </span>
-
-                <strong className="admin-stat-number">
-                  -
-                </strong>
-
-                <span className="admin-stat-description">
-                  Managed by you
-                </span>
-              </div>
-            </div>
-
-
-            {/* Role */}
-
-            <div className="admin-stat-card">
-              <div className="admin-stat-icon">
-                🛡️
-              </div>
-
-              <div>
-                <span className="admin-stat-label">
-                  Account Role
-                </span>
-
-                <strong className="admin-stat-role">
-                  Admin
-                </strong>
-
-                <span className="admin-stat-description">
-                  CampusNotes administrator
-                </span>
-              </div>
-            </div>
-
+      {/* Quick Actions */}
+      <section className="dashboard-section">
+        <div className="section-heading">
+          <div>
+            <h2>Quick Actions</h2>
+            <p>Common actions for managing CampusNotes.</p>
           </div>
+        </div>
 
+        <div className="quick-actions-grid">
 
-          {/* =====================================
-              PENDING NOTES
-          ===================================== */}
+          <Link
+            to="/admin/notes/pending"
+            className="quick-action-card"
+          >
+            <strong>Pending Notes</strong>
+            <span>
+              Review notes waiting for approval.
+            </span>
+          </Link>
 
-          <div className="admin-dashboard-section">
+          <Link
+            to="/admin/notes/manage"
+            className="quick-action-card"
+          >
+            <strong>Manage Notes</strong>
+            <span>
+              View and manage accessible notes.
+            </span>
+          </Link>
 
-            <div className="admin-section-header">
-              <div>
-                <h2>Pending Notes</h2>
+          <Link
+            to="/my-notes"
+            className="quick-action-card"
+          >
+            <strong>My Notes</strong>
+            <span>
+              View notes you have uploaded.
+            </span>
+          </Link>
 
-                <p>
-                  Review notes waiting for
-                  approval.
-                </p>
-              </div>
-
-              {!loading && pendingCount > 0 && (
-                <span className="admin-pending-badge">
-                  {pendingCount} pending
-                </span>
-              )}
-            </div>
-
-
-            <div className="admin-dashboard-card">
-
-              <div className="admin-dashboard-card-icon">
-                📋
-              </div>
-
-              <div className="admin-dashboard-card-content">
-                <h3>
-                  Notes waiting for moderation
-                </h3>
-
-                <p>
-                  Review uploaded notes, verify
-                  their content and either approve
-                  or reject them.
-                </p>
-
-                <button
-                  className="admin-dashboard-primary-button"
-                  onClick={() =>
-                    navigate(
-                      "/admin/notes/pending"
-                    )
-                  }
-                >
-                  Review Pending Notes →
-                </button>
-              </div>
-
-            </div>
-
-          </div>
-
-
-          {/* =====================================
-              QUICK ACTIONS
-          ===================================== */}
-
-          <div className="admin-dashboard-section">
-
-            <div className="admin-section-header">
-              <div>
-                <h2>Quick Actions</h2>
-
-                <p>
-                  Common administrative actions.
-                </p>
-              </div>
-            </div>
-
-
-            <div className="admin-quick-actions">
-
-              <button
-                className="admin-quick-action"
-                onClick={() =>
-                  navigate(
-                    "/admin/notes/pending"
-                  )
-                }
-              >
-                <span>📋</span>
-
-                <div>
-                  <strong>
-                    Pending Notes
-                  </strong>
-
-                  <small>
-                    Review and moderate notes
-                  </small>
-                </div>
-              </button>
-
-
-              <button
-                className="admin-quick-action"
-                onClick={() =>
-                  navigate("/my-notes")
-                }
-              >
-                <span>📚</span>
-
-                <div>
-                  <strong>
-                    My Notes
-                  </strong>
-
-                  <small>
-                    View notes uploaded by you
-                  </small>
-                </div>
-              </button>
-
-
-              <button
-                className="admin-quick-action"
-                onClick={() =>
-                  navigate("/upload")
-                }
-              >
-                <span>⬆️</span>
-
-                <div>
-                  <strong>
-                    Upload Note
-                  </strong>
-
-                  <small>
-                    Upload a new note
-                  </small>
-                </div>
-              </button>
-
-            </div>
-
-          </div>
+          <Link
+            to="/upload"
+            className="quick-action-card"
+          >
+            <strong>Upload Note</strong>
+            <span>
+              Upload a new PDF note.
+            </span>
+          </Link>
 
         </div>
-      </PageContainer>
-    </>
+      </section>
+
+      </div>
+    </div>
   );
 }
 
