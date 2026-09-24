@@ -8,6 +8,7 @@ import {
 // Public pages
 import Login from "./pages/Login";
 import Register from "./pages/Register";
+import ChangePassword from "./pages/ChangePassword";
 
 // Student pages
 import Notes from "./pages/Notes";
@@ -49,6 +50,21 @@ function App() {
         <Route
           path="/register"
           element={<Register />}
+        />
+
+        <Route
+          path="/change-password"
+          element={
+            <ProtectedRoute
+              allowedRoles={[
+                "student",
+                "admin",
+                "master",
+              ]}
+            >
+              <ChangePassword />
+            </ProtectedRoute>
+          }
         />
 
 

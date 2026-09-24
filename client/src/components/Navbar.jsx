@@ -33,7 +33,9 @@ function Navbar() {
         </Link>
 
 
-        {/* Desktop Navigation */}
+        {/* ============================= */}
+        {/* DESKTOP NAVIGATION */}
+        {/* ============================= */}
 
         <nav className="desktop-nav">
 
@@ -49,11 +51,16 @@ function Navbar() {
             My Notes
           </Link>
 
-          {user?.role === "admin" && (
+          {/* Admin */}
+
+          {(user?.role === "admin" ||
+            user?.role === "master") && (
             <Link to="/admin">
               Admin
             </Link>
           )}
+
+          {/* Master */}
 
           {user?.role === "master" && (
             <>
@@ -75,6 +82,8 @@ function Navbar() {
             </>
           )}
 
+          {/* Manage Notes */}
+
           {(user?.role === "admin" ||
             user?.role === "master") && (
             <Link to="/admin/notes/manage">
@@ -82,10 +91,18 @@ function Navbar() {
             </Link>
           )}
 
+          {/* Change Password */}
+
+          <Link to="/change-password">
+            Change Password
+          </Link>
+
         </nav>
 
 
-        {/* Desktop User */}
+        {/* ============================= */}
+        {/* DESKTOP USER */}
+        {/* ============================= */}
 
         <div className="desktop-user">
 
@@ -100,7 +117,9 @@ function Navbar() {
         </div>
 
 
-        {/* Mobile Menu Button */}
+        {/* ============================= */}
+        {/* MOBILE MENU BUTTON */}
+        {/* ============================= */}
 
         <button
           className="mobile-menu-button"
@@ -113,7 +132,9 @@ function Navbar() {
       </div>
 
 
-      {/* Mobile Navigation */}
+      {/* ============================= */}
+      {/* MOBILE NAVIGATION */}
+      {/* ============================= */}
 
       {menuOpen && (
         <nav className="mobile-nav">
@@ -140,7 +161,10 @@ function Navbar() {
           </Link>
 
 
-          {user?.role === "admin" && (
+          {/* Admin */}
+
+          {(user?.role === "admin" ||
+            user?.role === "master") && (
             <Link
               to="/admin"
               onClick={closeMenu}
@@ -149,6 +173,8 @@ function Navbar() {
             </Link>
           )}
 
+
+          {/* Master */}
 
           {user?.role === "master" && (
             <>
@@ -165,8 +191,25 @@ function Navbar() {
               >
                 Users
               </Link>
+
+              <Link
+                to="/master/admins"
+                onClick={closeMenu}
+              >
+                Admins
+              </Link>
+
+              <Link
+                to="/master/subjects"
+                onClick={closeMenu}
+              >
+                Subjects
+              </Link>
             </>
           )}
+
+
+          {/* Manage Notes */}
 
           {(user?.role === "admin" ||
             user?.role === "master") && (
@@ -174,10 +217,12 @@ function Navbar() {
               to="/admin/notes/manage"
               onClick={closeMenu}
             >
-              Manage Notes
+              📝 Manage Notes
             </Link>
           )}
 
+
+          {/* Change Password */}
 
           <Link
             to="/change-password"
@@ -186,6 +231,8 @@ function Navbar() {
             🔐 Change Password
           </Link>
 
+
+          {/* Logout */}
 
           <button onClick={handleLogout}>
             🚪 Logout
