@@ -3,6 +3,7 @@ import {
   Routes,
   Route,
   Navigate,
+  useLocation,
 } from "react-router-dom";
 
 // Public pages
@@ -32,312 +33,389 @@ import ManageAdmins from "./pages/master/ManageAdmins";
 
 // Authentication / authorization
 import ProtectedRoute from "./components/ProtectedRoute";
+import Footer from "./components/Footer";
+
+function AppContent() {
+  const { pathname } = useLocation();
+
+  /*
+   * Footer should NOT appear on:
+   * 1. Login
+   * 2. Register
+   * 3. Change Password
+   */
+
+  const hideFooter =
+    pathname === "/login" ||
+    pathname === "/register" ||
+    pathname === "/change-password";
+
+  return (
+    <div className="app-shell">
+
+      <div className="app-route-content">
+
+        <Routes>
+
+          {/* =========================================
+              PUBLIC ROUTES
+          ========================================= */}
+
+          <Route
+            path="/login"
+            element={<Login />}
+          />
+
+          <Route
+            path="/register"
+            element={<Register />}
+          />
+
+          {/* =========================================
+              CHANGE PASSWORD
+              Student + Admin + Master
+              Footer hidden
+          ========================================= */}
+
+          <Route
+            path="/change-password"
+            element={
+              <ProtectedRoute
+                allowedRoles={[
+                  "student",
+                  "admin",
+                  "master",
+                ]}
+              >
+                <ChangePassword />
+              </ProtectedRoute>
+            }
+          />
+
+
+          {/* =========================================
+              NOTES
+              Student + Admin + Master
+          ========================================= */}
+
+          <Route
+            path="/notes"
+            element={
+              <ProtectedRoute
+                allowedRoles={[
+                  "student",
+                  "admin",
+                  "master",
+                ]}
+              >
+                <Notes />
+              </ProtectedRoute>
+            }
+          />
+
+
+          {/* =========================================
+              MY NOTES
+              Student + Admin + Master
+          ========================================= */}
+
+          <Route
+            path="/my-notes"
+            element={
+              <ProtectedRoute
+                allowedRoles={[
+                  "student",
+                  "admin",
+                  "master",
+                ]}
+              >
+                <MyNotes />
+              </ProtectedRoute>
+            }
+          />
+
+
+          {/* =========================================
+              READ APPROVED NOTE
+              Student + Admin + Master
+          ========================================= */}
+
+          <Route
+            path="/notes/:id/read"
+            element={
+              <ProtectedRoute
+                allowedRoles={[
+                  "student",
+                  "admin",
+                  "master",
+                ]}
+              >
+                <ReadNote />
+              </ProtectedRoute>
+            }
+          />
+
+
+          {/* =========================================
+              UPLOAD NOTE
+              Student + Admin + Master
+          ========================================= */}
+
+          <Route
+            path="/upload"
+            element={
+              <ProtectedRoute
+                allowedRoles={[
+                  "student",
+                  "admin",
+                  "master",
+                ]}
+              >
+                <UploadNote />
+              </ProtectedRoute>
+            }
+          />
+
+
+          {/* =========================================
+              UPDATE NOTE
+              Student + Admin + Master
+          ========================================= */}
+
+          <Route
+            path="/notes/:id/update"
+            element={
+              <ProtectedRoute
+                allowedRoles={[
+                  "student",
+                  "admin",
+                  "master",
+                ]}
+              >
+                <UpdateNote />
+              </ProtectedRoute>
+            }
+          />
+
+
+          {/* =========================================
+              ADMIN DASHBOARD
+              Admin + Master
+          ========================================= */}
+
+          <Route
+            path="/admin"
+            element={
+              <ProtectedRoute
+                allowedRoles={[
+                  "admin",
+                  "master",
+                ]}
+              >
+                <AdminDashboard />
+              </ProtectedRoute>
+            }
+          />
+
+
+          {/* =========================================
+              ADMIN - PENDING NOTES
+              Admin + Master
+          ========================================= */}
+
+          <Route
+            path="/admin/notes/pending"
+            element={
+              <ProtectedRoute
+                allowedRoles={[
+                  "admin",
+                  "master",
+                ]}
+              >
+                <PendingNotes />
+              </ProtectedRoute>
+            }
+          />
+
+
+          {/* =========================================
+              ADMIN - MANAGE NOTES
+              Admin + Master
+          ========================================= */}
+
+          <Route
+            path="/admin/notes/manage"
+            element={
+              <ProtectedRoute
+                allowedRoles={[
+                  "admin",
+                  "master",
+                ]}
+              >
+                <ManageNotes />
+              </ProtectedRoute>
+            }
+          />
+
+
+          {/* =========================================
+              ADMIN - READ NOTE
+              Admin + Master
+          ========================================= */}
+
+          <Route
+            path="/admin/notes/:id/read"
+            element={
+              <ProtectedRoute
+                allowedRoles={[
+                  "admin",
+                  "master",
+                ]}
+              >
+                <AdminReadNote />
+              </ProtectedRoute>
+            }
+          />
+
+
+          {/* =========================================
+              ADMIN - REVIEW NOTE
+              Admin + Master
+          ========================================= */}
+
+          <Route
+            path="/admin/notes/:id"
+            element={
+              <ProtectedRoute
+                allowedRoles={[
+                  "admin",
+                  "master",
+                ]}
+              >
+                <ReviewNote />
+              </ProtectedRoute>
+            }
+          />
+
+
+          {/* =========================================
+              MASTER DASHBOARD
+              Master Only
+          ========================================= */}
+
+          <Route
+            path="/master"
+            element={
+              <ProtectedRoute
+                allowedRoles={["master"]}
+              >
+                <MasterDashboard />
+              </ProtectedRoute>
+            }
+          />
+
+
+          {/* =========================================
+              MASTER - USERS
+              Master Only
+          ========================================= */}
+
+          <Route
+            path="/master/users"
+            element={
+              <ProtectedRoute
+                allowedRoles={["master"]}
+              >
+                <ManageUsers />
+              </ProtectedRoute>
+            }
+          />
+
+
+          {/* =========================================
+              MASTER - SUBJECTS
+              Master Only
+          ========================================= */}
+
+          <Route
+            path="/master/subjects"
+            element={
+              <ProtectedRoute
+                allowedRoles={["master"]}
+              >
+                <ManageSubjects />
+              </ProtectedRoute>
+            }
+          />
+
+
+          {/* =========================================
+              MASTER - ADMINS
+              Master Only
+          ========================================= */}
+
+          <Route
+            path="/master/admins"
+            element={
+              <ProtectedRoute
+                allowedRoles={["master"]}
+              >
+                <ManageAdmins />
+              </ProtectedRoute>
+            }
+          />
+
+
+          {/* =========================================
+              ROOT
+          ========================================= */}
+
+          <Route
+            path="/"
+            element={
+              <Navigate
+                to="/login"
+                replace
+              />
+            }
+          />
+
+
+          {/* =========================================
+              UNKNOWN URL
+          ========================================= */}
+
+          <Route
+            path="*"
+            element={
+              <Navigate
+                to="/"
+                replace
+              />
+            }
+          />
+
+        </Routes>
+
+      </div>
+
+
+      {/* =========================================
+          FOOTER
+          Hidden on Login, Register, Change Password
+      ========================================= */}
+
+      {!hideFooter && <Footer />}
+
+    </div>
+  );
+}
+
 
 function App() {
   return (
     <BrowserRouter>
-      <Routes>
-
-        {/* =========================================
-            PUBLIC ROUTES
-        ========================================= */}
-
-        <Route
-          path="/login"
-          element={<Login />}
-        />
-
-        <Route
-          path="/register"
-          element={<Register />}
-        />
-
-        <Route
-          path="/change-password"
-          element={
-            <ProtectedRoute
-              allowedRoles={[
-                "student",
-                "admin",
-                "master",
-              ]}
-            >
-              <ChangePassword />
-            </ProtectedRoute>
-          }
-        />
-
-
-        {/* =========================================
-            NOTES
-            Student + Admin + Master
-        ========================================= */}
-
-        <Route
-          path="/notes"
-          element={
-            <ProtectedRoute
-              allowedRoles={[
-                "student",
-                "admin",
-                "master",
-              ]}
-            >
-              <Notes />
-            </ProtectedRoute>
-          }
-        />
-
-
-        {/* =========================================
-            MY NOTES
-            Student + Admin + Master
-        ========================================= */}
-
-        <Route
-          path="/my-notes"
-          element={
-            <ProtectedRoute
-              allowedRoles={[
-                "student",
-                "admin",
-                "master",
-              ]}
-            >
-              <MyNotes />
-            </ProtectedRoute>
-          }
-        />
-
-
-        {/* =========================================
-            READ APPROVED NOTE
-            Student + Admin + Master
-        ========================================= */}
-
-        <Route
-          path="/notes/:id/read"
-          element={
-            <ProtectedRoute
-              allowedRoles={[
-                "student",
-                "admin",
-                "master",
-              ]}
-            >
-              <ReadNote />
-            </ProtectedRoute>
-          }
-        />
-
-
-        {/* =========================================
-            UPLOAD NOTE
-            Student + Admin + Master
-        ========================================= */}
-
-        <Route
-          path="/upload"
-          element={
-            <ProtectedRoute
-              allowedRoles={[
-                "student",
-                "admin",
-                "master",
-              ]}
-            >
-              <UploadNote />
-            </ProtectedRoute>
-          }
-        />
-
-
-        {/* =========================================
-            UPDATE NOTE
-            Student + Admin + Master
-        ========================================= */}
-
-        <Route
-          path="/notes/:id/update"
-          element={
-            <ProtectedRoute
-              allowedRoles={[
-                "student",
-                "admin",
-                "master",
-              ]}
-            >
-              <UpdateNote />
-            </ProtectedRoute>
-          }
-        />
-
-
-        {/* =========================================
-            ADMIN DASHBOARD
-            Admin + Master
-
-            Master can access Admin functionality.
-        ========================================= */}
-
-        <Route
-          path="/admin"
-          element={
-            <ProtectedRoute
-              allowedRoles={[
-                "admin",
-                "master",
-              ]}
-            >
-              <AdminDashboard />
-            </ProtectedRoute>
-          }
-        />
-
-
-        {/* =========================================
-            ADMIN - PENDING NOTES
-            Admin + Master
-        ========================================= */}
-
-        <Route
-          path="/admin/notes/pending"
-          element={
-            <ProtectedRoute
-              allowedRoles={[
-                "admin",
-                "master",
-              ]}
-            >
-              <PendingNotes />
-            </ProtectedRoute>
-          }
-        />
-
-
-        <Route
-          path="/admin/notes/manage"
-          element={
-            <ProtectedRoute
-              allowedRoles={["admin", "master"]}
-            >
-              <ManageNotes />
-            </ProtectedRoute>
-          }
-        />
-
-
-        {/* =========================================
-            ADMIN - REVIEW NOTE
-            Admin + Master
-
-            IMPORTANT:
-            This must come BEFORE /admin/notes/:id
-            ========================================= */}
-
-        <Route
-          path="/admin/notes/:id/read"
-          element={
-            <ProtectedRoute
-              allowedRoles={[
-                "admin",
-                "master",
-              ]}
-            >
-              <AdminReadNote />
-            </ProtectedRoute>
-          }
-        />
-
-        <Route
-          path="/admin/notes/:id"
-          element={
-            <ProtectedRoute
-              allowedRoles={[
-                "admin",
-                "master",
-              ]}
-            >
-              <ReviewNote />
-            </ProtectedRoute>
-          }
-        />
-
-
-        {/* =========================================
-            MASTER DASHBOARD
-            MASTER ONLY
-        ========================================= */}
-
-        <Route
-          path="/master"
-          element={
-            <ProtectedRoute
-              allowedRoles={["master"]}
-            >
-              <MasterDashboard />
-            </ProtectedRoute>
-          }
-        />
-
-        <Route
-          path="/master/users"
-          element={
-            <ProtectedRoute allowedRoles={["master"]}>
-              <ManageUsers />
-            </ProtectedRoute>
-          }
-        />
-
-        <Route
-          path="/master/subjects"
-          element={
-            <ProtectedRoute allowedRoles={["master"]}>
-              <ManageSubjects />
-            </ProtectedRoute>
-          }
-        />
-
-        <Route
-          path="/master/admins"
-          element={
-            <ProtectedRoute allowedRoles={["master"]}>
-              <ManageAdmins />
-            </ProtectedRoute>
-          }
-        />
-
-
-        {/* =========================================
-            ROOT
-        ========================================= */}
-
-        <Route
-          path="/"
-          element={
-            <Navigate
-              to="/login"
-              replace
-            />
-          }
-        />
-
-
-        {/* =========================================
-            UNKNOWN URL
-        ========================================= */}
-
-        <Route
-          path="*"
-          element={
-            <Navigate
-              to="/"
-              replace
-            />
-          }
-        />
-
-      </Routes>
+      <AppContent />
     </BrowserRouter>
   );
 }

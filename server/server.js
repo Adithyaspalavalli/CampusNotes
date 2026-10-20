@@ -13,6 +13,7 @@ const noteRoutes = require("./routes/noteRoutes");
 const subjectRoutes = require("./routes/subjectRoutes");
 const adminNoteRoutes = require("./routes/adminNoteRoutes");
 const testRoutes = require("./routes/testRoutes");
+const b2TestRoutes = require("./routes/b2TestRoutes");
 
 dotenv.config();
 
@@ -54,6 +55,7 @@ app.use(
   adminNoteRoutes
 );
 app.use("/api/test", testRoutes);
+app.use("/api/b2-test", b2TestRoutes);
 
 // Global error handler
 app.use((err, req, res, next) => {

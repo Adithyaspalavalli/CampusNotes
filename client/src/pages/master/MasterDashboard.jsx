@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 import Navbar from "../../components/Navbar";
@@ -11,6 +11,12 @@ function MasterDashboard() {
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [analytics, setAnalytics] = useState(null);
+  const [analyticsLoading, setAnalyticsLoading] = useState(false);
+  const [analyticsError, setAnalyticsError] = useState("");
+  const [exporting, setExporting] = useState(false);
+  const [fromDate, setFromDate] = useState("");
+  const [toDate, setToDate] = useState("");
 
   const fetchStats = async () => {
     try {
@@ -37,9 +43,94 @@ function MasterDashboard() {
     }
   };
 
+  const fetchAnalytics = useCallback(async (from, to) => {
+    if (from && to && from > to) {
+      setAnalyticsError(
+        "The start date cannot be after the end date."
+      );
+      return;
+    }
+
+    try {
+      setAnalyticsLoading(true);
+      setAnalyticsError("");
+
+      const params = {};
+      if (from) params.from = from;
+      if (to) params.to = to;
+
+      const response = await api.get(
+        "/master/dashboard/analytics",
+        { params }
+      );
+
+      setAnalytics(response.data);
+    } catch (error) {
+      console.error("Master analytics error:", error);
+      setAnalyticsError(
+        error.response?.data?.message ||
+          "Failed to load analytics."
+      );
+    } finally {
+      setAnalyticsLoading(false);
+    }
+  }, []);
+
+  const handleExportAnalytics = async () => {
+    if (fromDate && toDate && fromDate > toDate) {
+      setAnalyticsError(
+        "The start date cannot be after the end date."
+      );
+      return;
+    }
+
+    try {
+      setExporting(true);
+      setAnalyticsError("");
+
+      const params = {};
+      if (fromDate) params.from = fromDate;
+      if (toDate) params.to = toDate;
+
+      const response = await api.get(
+        "/master/dashboard/analytics/export",
+        {
+          params,
+          responseType: "blob",
+        }
+      );
+
+      const url = window.URL.createObjectURL(
+        new Blob([response.data], {
+          type: "text/csv;charset=utf-8;",
+        })
+      );
+
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = "campusnotes-master-analytics.csv";
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error("Master analytics export error:", error);
+      setAnalyticsError(
+        "Failed to export analytics. Please try again."
+      );
+    } finally {
+      setExporting(false);
+    }
+  };
+
   useEffect(() => {
     fetchStats();
   }, []);
+
+  useEffect(() => {
+    Promise.resolve().then(() => fetchAnalytics("", ""));
+  }, [fetchAnalytics]);
 
   if (loading) {
     return (
@@ -300,6 +391,185 @@ function MasterDashboard() {
               </div>
 
             </div>
+          </section>
+
+          {/* DOWNLOAD ANALYTICS */}
+          <section className="master-dashboard-section">
+            <div className="master-section-header">
+              <div>
+                <h2>Download Analytics</h2>
+                <p>
+                  Analyze note downloads, subject rankings, and note statuses.
+                </p>
+              </div>
+            </div>
+
+            <div className="analytics-controls">
+              <label>
+                From date
+                <input
+                  type="date"
+                  value={fromDate}
+                  max={toDate || undefined}
+                  onChange={(e) => setFromDate(e.target.value)}
+                />
+              </label>
+
+              <label>
+                To date
+                <input
+                  type="date"
+                  value={toDate}
+                  min={fromDate || undefined}
+                  onChange={(e) => setToDate(e.target.value)}
+                />
+              </label>
+
+              <button
+                type="button"
+                className="master-refresh-button"
+                disabled={analyticsLoading}
+                onClick={() => fetchAnalytics(fromDate, toDate)}
+              >
+                {analyticsLoading ? "Loading..." : "Apply Filters"}
+              </button>
+
+              <button
+                type="button"
+                className="master-refresh-button"
+                disabled={analyticsLoading}
+                onClick={() => {
+                  setFromDate("");
+                  setToDate("");
+                  fetchAnalytics("", "");
+                }}
+              >
+                Clear Dates
+              </button>
+
+              <button
+                type="button"
+                className="master-refresh-button"
+                disabled={exporting}
+                onClick={handleExportAnalytics}
+              >
+                {exporting ? "Exporting..." : "Export CSV"}
+              </button>
+            </div>
+
+            {analyticsError && (
+              <div className="notes-message error-box">
+                {analyticsError}
+              </div>
+            )}
+
+            {analyticsLoading && (
+              <div className="notes-message">
+                Loading analytics...
+              </div>
+            )}
+
+            {analytics && !analyticsLoading && (
+              <>
+                <h3>Summary</h3>
+
+                <div className="master-detail-grid">
+                  <div className="master-detail-card">
+                    <span>Total Notes</span>
+                    <strong>{analytics.summary.totalNotes}</strong>
+                  </div>
+
+                  <div className="master-detail-card">
+                    <span>Pending</span>
+                    <strong>{analytics.summary.pendingNotes}</strong>
+                  </div>
+
+                  <div className="master-detail-card">
+                    <span>Approved</span>
+                    <strong>{analytics.summary.approvedNotes}</strong>
+                  </div>
+
+                  <div className="master-detail-card">
+                    <span>Rejected</span>
+                    <strong>{analytics.summary.rejectedNotes}</strong>
+                  </div>
+
+                  <div className="master-detail-card">
+                    <span>Outdated</span>
+                    <strong>{analytics.summary.outdatedNotes}</strong>
+                  </div>
+
+                  <div className="master-detail-card">
+                    <span>Total Downloads</span>
+                    <strong>{analytics.summary.totalDownloads}</strong>
+                  </div>
+                </div>
+
+                <h3 className="analytics-subheading">
+                  Most-Downloaded Notes
+                </h3>
+
+                {analytics.mostDownloadedNotes?.length > 0 ? (
+                  <div className="analytics-table-container">
+                    <table className="analytics-table">
+                      <thead>
+                        <tr>
+                          <th>Note</th>
+                          <th>Subject</th>
+                          <th>Downloads</th>
+                        </tr>
+                      </thead>
+
+                      <tbody>
+                        {analytics.mostDownloadedNotes.map((note) => (
+                          <tr key={note._id}>
+                            <td>
+                              {note.title || note.fileName || "Untitled"}
+                            </td>
+                            <td>{note.subjectName || "—"}</td>
+                            <td>{note.downloads}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  <p>No downloaded notes found for this selection.</p>
+                )}
+
+                <h3 className="analytics-subheading">
+                  Subject Rankings
+                </h3>
+
+                {analytics.subjectRankings?.length > 0 ? (
+                  <div className="analytics-table-container">
+                    <table className="analytics-table">
+                      <thead>
+                        <tr>
+                          <th>Rank</th>
+                          <th>Subject</th>
+                          <th>Code</th>
+                          <th>Downloads</th>
+                        </tr>
+                      </thead>
+
+                      <tbody>
+                        {analytics.subjectRankings.map((subject, index) => (
+                          <tr key={subject._id}>
+                            <td>{index + 1}</td>
+                            <td>{subject.name}</td>
+                            <td>{subject.code || "—"}</td>
+                            <td>{subject.downloads}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  <p>No subject download activity found.</p>
+                )}
+              </>
+            )}
           </section>
 
           {/* QUICK MANAGEMENT */}

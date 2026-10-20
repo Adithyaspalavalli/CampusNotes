@@ -4,6 +4,15 @@ const path = require("path");
 
 const Note = require("../models/Note");
 const Subject = require("../models/Subject");
+const DownloadEvent = require("../models/DownloadEvent");
+
+const {
+  uploadToB2,
+  getB2ReadUrl,
+  getB2DownloadUrl,
+  getB2File,
+  deleteFromB2,
+} = require("../services/b2Storage");
 
 /*
 ==================================================
@@ -236,16 +245,25 @@ const deleteMyNote = async (req, res) => {
     }
 
     /*
-    ==================================================
-    DELETE PDF FILE
-    ==================================================
+    -----------------------------------------------
+    DELETE PDF FROM BACKBLAZE B2
+    -----------------------------------------------
     */
 
-    if (
-      note.fileUrl &&
-      fs.existsSync(note.fileUrl)
-    ) {
-      fs.unlinkSync(note.fileUrl);
+    if (note.fileUrl) {
+      try {
+        await deleteFromB2(note.fileUrl);
+      } catch (b2Error) {
+        console.error(
+          "Failed to delete PDF from Backblaze B2:",
+          b2Error
+        );
+
+        return res.status(500).json({
+          message:
+            "Failed to delete PDF from cloud storage",
+        });
+      }
     }
 
     /*
@@ -382,19 +400,33 @@ const readNote = async (req, res) => {
       });
     }
 
-    /*
-    -----------------------------------------------
-    CHECK PDF FILE
-    -----------------------------------------------
-    */
-
-    if (
-      !note.fileUrl ||
-      !fs.existsSync(note.fileUrl)
-    ) {
+    if (!note.fileUrl) {
       return res.status(404).json({
         message: "PDF file not found",
       });
+    }
+
+    let fileStream;
+
+    if (
+      path.isAbsolute(note.fileUrl) ||
+      path.win32.isAbsolute(note.fileUrl)
+    ) {
+      if (!fs.existsSync(note.fileUrl)) {
+        return res.status(404).json({
+          message: "PDF file not found",
+        });
+      }
+
+      fileStream = fs.createReadStream(note.fileUrl);
+    } else {
+      const b2File = await getB2File(note.fileUrl);
+
+      if (!b2File.Body) {
+        throw new Error("B2 returned an empty file body");
+      }
+
+      fileStream = b2File.Body;
     }
 
     /*
@@ -413,9 +445,6 @@ const readNote = async (req, res) => {
       `inline; filename="${note.fileName}"`
     );
 
-    const fileStream =
-      fs.createReadStream(note.fileUrl);
-
     fileStream.on(
       "error",
       (error) => {
@@ -428,6 +457,8 @@ const readNote = async (req, res) => {
           res.status(500).json({
             message: "Failed to read PDF",
           });
+        } else {
+          res.destroy(error);
         }
       }
     );
@@ -439,6 +470,16 @@ const readNote = async (req, res) => {
       "Read note error:",
       error
     );
+
+    if (
+      error.name === "NoSuchKey" ||
+      error.name === "NotFound" ||
+      error.$metadata?.httpStatusCode === 404
+    ) {
+      return res.status(404).json({
+        message: "PDF file not found",
+      });
+    }
 
     if (!res.headersSent) {
       return res.status(500).json({
@@ -461,23 +502,11 @@ const downloadNote = async (req, res) => {
   try {
     const { id } = req.params;
 
-    /*
-    -----------------------------------------------
-    VALIDATE ID
-    -----------------------------------------------
-    */
-
     if (!mongoose.Types.ObjectId.isValid(id)) {
       return res.status(400).json({
         message: "Invalid note ID",
       });
     }
-
-    /*
-    -----------------------------------------------
-    ONLY APPROVED + CURRENT NOTES
-    -----------------------------------------------
-    */
 
     const note = await Note.findOne({
       _id: id,
@@ -487,84 +516,98 @@ const downloadNote = async (req, res) => {
 
     if (!note) {
       return res.status(404).json({
-        message:
-          "Note not found or is no longer available",
+        message: "Note not found or is no longer available",
       });
     }
 
-    /*
-    -----------------------------------------------
-    CHECK PDF
-    -----------------------------------------------
-    */
-
-    if (
-      !note.fileUrl ||
-      !fs.existsSync(note.fileUrl)
-    ) {
+    if (!note.fileUrl) {
       return res.status(404).json({
         message: "PDF file not found",
       });
     }
 
-    /*
-    -----------------------------------------------
-    INCREASE DOWNLOAD COUNT
-    -----------------------------------------------
-    */
+    // Support both older local files and Backblaze B2.
+    let fileStream;
 
-    note.downloadCount += 1;
+    const isLocalFile =
+      path.isAbsolute(note.fileUrl) ||
+      path.win32.isAbsolute(note.fileUrl);
 
-    await note.save();
+    if (isLocalFile) {
+      if (!fs.existsSync(note.fileUrl)) {
+        return res.status(404).json({
+          message: "PDF file not found",
+        });
+      }
 
-    /*
-    -----------------------------------------------
-    PDF DOWNLOAD
-    -----------------------------------------------
-    */
+      fileStream = fs.createReadStream(note.fileUrl);
+    } else {
+      const b2File = await getB2File(note.fileUrl);
 
-    res.setHeader(
-      "Content-Type",
-      "application/pdf"
-    );
+      if (!b2File.Body) {
+        return res.status(404).json({
+          message: "PDF file not found in cloud storage",
+        });
+      }
 
+      fileStream = b2File.Body;
+    }
+
+    // Record analytics only after the response finishes.
+    res.on("finish", async () => {
+      if (res.statusCode >= 400) return;
+
+      try {
+        await Promise.all([
+          Note.updateOne(
+            { _id: note._id },
+            { $inc: { downloadCount: 1 } }
+          ),
+
+          DownloadEvent.create({
+            note: note._id,
+            subject: note.subject,
+            student: req.user._id,
+            downloadedAt: new Date(),
+          }),
+        ]);
+      } catch (trackingError) {
+        console.error(
+          "Failed to record download analytics:",
+          trackingError
+        );
+      }
+    });
+
+    res.setHeader("Content-Type", "application/pdf");
     res.setHeader(
       "Content-Disposition",
-      `attachment; filename="${note.fileName}"`
+      `attachment; filename="${note.fileName.replace(/["\r\n]/g, "_")}"`
     );
 
-    const fileStream =
-      fs.createReadStream(note.fileUrl);
+    fileStream.on("error", (error) => {
+      console.error("PDF download stream error:", error);
 
-    fileStream.on(
-      "error",
-      (error) => {
-        console.error(
-          "PDF download stream error:",
-          error
-        );
-
-        if (!res.headersSent) {
-          res.status(500).json({
-            message: "Failed to download PDF",
-          });
-        }
+      if (!res.headersSent) {
+        res.status(500).json({
+          message: "Failed to download PDF",
+        });
+      } else {
+        res.destroy(error);
       }
-    );
+    });
 
     fileStream.pipe(res);
-
   } catch (error) {
-    console.error(
-      "Download note error:",
-      error
-    );
+    console.error("Download note error:", error);
 
     if (!res.headersSent) {
       return res.status(500).json({
         message: "Failed to download note",
       });
     }
+
+    res.destroy(error);
   }
 };
 
@@ -576,6 +619,8 @@ POST /api/notes
 */
 
 const createNote = async (req, res) => {
+  let uploadedB2Key = null;
+
   try {
     const {
       title,
@@ -676,12 +721,52 @@ const createNote = async (req, res) => {
 
     /*
     -----------------------------------------------
+    READ TEMPORARY LOCAL FILE
+    -----------------------------------------------
+    */
+
+    const fileBuffer = await fs.promises.readFile(
+      req.file.path
+    );
+
+    /*
+    -----------------------------------------------
     CREATE NOTE SERIES
     -----------------------------------------------
     */
 
     const noteSeriesId =
       new mongoose.Types.ObjectId();
+
+    /*
+    -----------------------------------------------
+    CREATE B2 FILE KEY
+    -----------------------------------------------
+    */
+
+    const b2Key = `notes/${noteSeriesId.toString()}/v1-${Date.now()}.pdf`;
+
+    /*
+    -----------------------------------------------
+    UPLOAD PDF TO BACKBLAZE B2
+    -----------------------------------------------
+    */
+
+    await uploadToB2({
+      key: b2Key,
+      body: fileBuffer,
+      contentType: "application/pdf",
+    });
+
+    uploadedB2Key = b2Key;
+
+    /*
+    -----------------------------------------------
+    DELETE TEMPORARY LOCAL FILE
+    -----------------------------------------------
+    */
+
+    await fs.promises.unlink(req.file.path);
 
     /*
     -----------------------------------------------
@@ -699,7 +784,8 @@ const createNote = async (req, res) => {
       unit: Number(unit),
       topic,
 
-      fileUrl: req.file.path,
+      // Store B2 object key instead of local file path
+      fileUrl: b2Key,
       fileName: req.file.originalname,
 
       uploadedBy: req.user._id,
@@ -708,6 +794,7 @@ const createNote = async (req, res) => {
       version: 1,
       previousVersion: null,
 
+      // First upload is waiting for approval
       isCurrent: false,
       status: "PENDING",
 
@@ -719,7 +806,6 @@ const createNote = async (req, res) => {
         "Note uploaded successfully and is waiting for approval",
       note,
     });
-
   } catch (error) {
     console.error(
       "Create note error:",
@@ -728,22 +814,38 @@ const createNote = async (req, res) => {
 
     /*
     -----------------------------------------------
-    DELETE FILE IF DATABASE CREATION FAILS
+    DELETE B2 FILE IF DATABASE CREATION FAILS
+    -----------------------------------------------
+    */
+
+    if (uploadedB2Key) {
+      try {
+        await deleteFromB2(uploadedB2Key);
+      } catch (deleteError) {
+        console.error(
+          "Failed to delete B2 file after error:",
+          deleteError
+        );
+      }
+    }
+
+    /*
+    -----------------------------------------------
+    DELETE TEMPORARY LOCAL FILE
     -----------------------------------------------
     */
 
     if (req.file?.path) {
-      fs.unlink(
-        req.file.path,
-        (unlinkError) => {
-          if (unlinkError) {
-            console.error(
-              "Failed to delete uploaded file:",
-              unlinkError
-            );
-          }
+      try {
+        if (fs.existsSync(req.file.path)) {
+          await fs.promises.unlink(req.file.path);
         }
-      );
+      } catch (unlinkError) {
+        console.error(
+          "Failed to delete temporary file:",
+          unlinkError
+        );
+      }
     }
 
     return res.status(500).json({

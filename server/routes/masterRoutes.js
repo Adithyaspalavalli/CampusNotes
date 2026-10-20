@@ -8,6 +8,11 @@ const {
 } = require("../controllers/masterDashboardController");
 
 const {
+  getAnalytics,
+  exportAnalyticsCsv,
+} = require("../controllers/analyticsController");
+
+const {
   getAllUsers,
   changeUserRole,
   toggleUserStatus,
@@ -54,6 +59,20 @@ router.get(
   protect,
   masterOnly,
   getMasterDashboardStats
+);
+
+router.get(
+  "/dashboard/analytics",
+  protect,
+  masterOnly,
+  getAnalytics
+);
+
+router.get(
+  "/dashboard/analytics/export",
+  protect,
+  masterOnly,
+  exportAnalyticsCsv
 );
 
 // Assign subjects to Admin
