@@ -447,7 +447,6 @@ input {
 
 }
 
-
 /* ============================= */
 /* MOBILE */
 /* ============================= */
@@ -3570,4 +3569,158 @@ input {
     padding: 17px;
   }
 
+}
+
+/* =========================================
+   GLOBAL THEME VARIABLES
+========================================= */
+
+:root {
+  color-scheme: light;
+
+  --app-bg: #f5f7fb;
+  --surface: #ffffff;
+  --surface-secondary: #f9fafb;
+  --text-primary: #111827;
+  --text-secondary: #6b7280;
+  --border-color: #e5e7eb;
+  --input-bg: #ffffff;
+  --input-text: #111827;
+  --hover-bg: #f3f4f6;
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+
+  --app-bg: #0f172a;
+  --surface: #1e293b;
+  --surface-secondary: #172033;
+  --text-primary: #f1f5f9;
+  --text-secondary: #cbd5e1;
+  --border-color: #334155;
+  --input-bg: #0f172a;
+  --input-text: #f1f5f9;
+  --hover-bg: #334155;
+}
+
+/* =========================================
+   GLOBAL PAGE COLORS
+========================================= */
+
+body {
+  background: var(--app-bg);
+  color: var(--text-primary);
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+.page-container,
+.app-shell,
+.app-route-content {
+  color: var(--text-primary);
+}
+
+:root[data-theme="dark"] .navbar,
+:root[data-theme="dark"] .mobile-nav,
+:root[data-theme="dark"] .auth-card,
+:root[data-theme="dark"] .notes-filters,
+:root[data-theme="dark"] .note-card,
+:root[data-theme="dark"] .notes-message,
+:root[data-theme="dark"] .upload-form,
+:root[data-theme="dark"] .my-note-card,
+:root[data-theme="dark"] .update-note-card,
+:root[data-theme="dark"] .admin-note-card,
+:root[data-theme="dark"] .review-card,
+:root[data-theme="dark"] .review-details div {
+  background: var(--surface);
+  color: var(--text-primary);
+  border-color: var(--border-color);
+}
+
+:root[data-theme="dark"] .navbar-logo,
+:root[data-theme="dark"] .notes-header h1,
+:root[data-theme="dark"] .note-card h3,
+:root[data-theme="dark"] .admin-page-header h1,
+:root[data-theme="dark"] .admin-note-title-row h2,
+:root[data-theme="dark"] .review-header h1,
+:root[data-theme="dark"] .review-card h2,
+:root[data-theme="dark"] .review-card h3,
+:root[data-theme="dark"] .review-details strong,
+:root[data-theme="dark"] .form-group label,
+:root[data-theme="dark"] .my-note-title-row h2 {
+  color: var(--text-primary);
+}
+
+:root[data-theme="dark"] .desktop-nav a,
+:root[data-theme="dark"] .desktop-user span,
+:root[data-theme="dark"] .mobile-nav a,
+:root[data-theme="dark"] .mobile-nav button,
+:root[data-theme="dark"] .note-description,
+:root[data-theme="dark"] .note-meta,
+:root[data-theme="dark"] .notes-header p,
+:root[data-theme="dark"] .upload-header p,
+:root[data-theme="dark"] .review-card p {
+  color: var(--text-secondary);
+}
+
+:root[data-theme="dark"] input,
+:root[data-theme="dark"] textarea,
+:root[data-theme="dark"] select,
+:root[data-theme="dark"] .search-box {
+  background: var(--input-bg);
+  color: var(--input-text);
+  border-color: var(--border-color);
+}
+
+:root[data-theme="dark"] .search-box input {
+  background: transparent;
+  color: var(--input-text);
+}
+
+:root[data-theme="dark"] .note-card-footer,
+:root[data-theme="dark"] .mobile-nav,
+:root[data-theme="dark"] .copyright {
+  border-color: var(--border-color);
+}
+
+:root[data-theme="dark"] .note-subject,
+:root[data-theme="dark"] .read-button,
+:root[data-theme="dark"] .my-note-update-button,
+:root[data-theme="dark"] .cancel-button {
+  background: #334155;
+  color: #f1f5f9;
+}
+
+/* =========================================
+   THEME TOGGLE BUTTON
+========================================= */
+
+.theme-toggle-button {
+  flex-shrink: 0;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 9px 12px;
+  background: var(--surface);
+  color: var(--text-primary);
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.theme-toggle-button:hover {
+  background: var(--hover-bg);
+}
+
+.mobile-theme-toggle {
+  width: 100%;
+  text-align: left;
+  margin-bottom: 8px;
+}
+
+:root[data-theme="dark"] .mobile-menu-button,
+:root[data-theme="dark"] .desktop-user button {
+  color: var(--text-primary);
+}
+
+:root[data-theme="dark"] .footer {
+  background: #020617;
 }

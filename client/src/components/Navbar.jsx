@@ -1,9 +1,11 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
+import { useTheme } from "../context/ThemeContext";
 
 function Navbar() {
   const { user, logout } = useAuth();
+  const { theme, toggleTheme } = useTheme();
   const navigate = useNavigate();
 
   const [menuOpen, setMenuOpen] = useState(false);
@@ -122,6 +124,17 @@ function Navbar() {
         {/* ============================= */}
 
         <button
+          type="button"
+          className="theme-toggle-button"
+          onClick={toggleTheme}
+          aria-label={`Switch to ${theme === "light" ? "dark" : "light"} theme`}
+          aria-pressed={theme === "dark"}
+          title={`Switch to ${theme === "light" ? "dark" : "light"} theme`}
+        >
+          {theme === "light" ? "🌙 Dark" : "☀️ Light"}
+        </button>
+
+        <button
           className="mobile-menu-button"
           onClick={() => setMenuOpen(!menuOpen)}
           aria-label="Toggle navigation menu"
@@ -138,6 +151,15 @@ function Navbar() {
 
       {menuOpen && (
         <nav className="mobile-nav">
+
+          <button
+            type="button"
+            className="theme-toggle-button mobile-theme-toggle"
+            onClick={toggleTheme}
+            aria-pressed={theme === "dark"}
+          >
+            {theme === "light" ? "🌙 Switch to Dark Mode" : "☀️ Switch to Light Mode"}
+          </button>
 
           <Link
             to="/notes"
