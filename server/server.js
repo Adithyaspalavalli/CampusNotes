@@ -28,8 +28,16 @@ const PORT = process.env.PORT || 5000;
 connectDB();
 
 // Middleware
-app.use(cors({
-  origin:['http://localhost:5173', 'https://vercel.app'],credentials:true}));
+app.use(
+  cors({
+    origin: [
+      "https://campus-notes-five.vercel.app",
+      "http://localhost:5173",
+    ],
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
+  })
+);
 
 // Routes
 app.use("/api/auth", authRoutes);
