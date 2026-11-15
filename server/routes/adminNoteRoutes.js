@@ -1,7 +1,7 @@
 const express = require("express");
 
 const protect = require("../middleware/authMiddleware");
-const adminOnly = require("../middleware/adminmiddleware");
+const adminOnly = require("../middleware/adminMiddleware");
 
 // Existing admin note controller
 const {
