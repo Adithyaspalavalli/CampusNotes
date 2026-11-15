@@ -32,7 +32,7 @@ app.use(
   cors({
     origin: [
       "https://campus-notes-five.vercel.app",
-      "http://localhost:5173",
+      "http://localhost:5173", 'https://campus-notes-hdlnwb5y6-palavallisaditya-gmailcoms-projects.vercel.app',
     ],
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization"],
