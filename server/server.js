@@ -29,7 +29,7 @@ connectDB();
 
 // Middleware
 app.use(cors({
-  origin:['http://localhost:5173', 'https://vercel.app'],credentials=true));
+  origin:['http://localhost:5173', 'https://vercel.app'],credentials:true));
 
 // Routes
 app.use("/api/auth", authRoutes);
