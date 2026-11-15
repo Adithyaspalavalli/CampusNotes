@@ -2,7 +2,7 @@ const express = require("express");
 
 const protect = require("../middleware/authMiddleware");
 const masterOnly = require("../middleware/masterMiddleware");
-const adminOnly = require("../middleware/adminmiddleware");
+const adminOnly = require("../middleware/adminMiddleware");
 
 const {
   getMasterStats,
